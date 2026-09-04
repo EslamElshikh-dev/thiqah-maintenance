@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: thiqah-staging-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: feat/phase2-connected-staging
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 30
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: staging
+      - key: DATABASE_MODE
+        value: url
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: STORAGE_PROVIDER
+        value: r2
+      - key: OTP_PROVIDER
+        value: unifonic
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: SESSION_COOKIE_SAME_SITE
+        value: lax
+      - key: SESSION_TTL_SECONDS
+        value: "604800"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PUBLIC_APP_ORIGINS
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: UNIFONIC_APPSID
+        sync: false
+      - key: SMS_SENDER_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SUPPORT_FROM_EMAIL
+        sync: false
+      - key: SESSION_HMAC_KEY
+        generateValue: true
+      - key: PII_HASH_KEY
+        generateValue: true
+      - key: MFA_ENCRYPTION_KEY_BASE64
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY_BASE64
+        generateValue: true
