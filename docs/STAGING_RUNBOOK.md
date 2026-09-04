@@ -1,143 +1,131 @@
-# Thiqah v1 staging runbook
+# Thiqah v1 free staging runbook
 
-This runbook starts from the current GitHub state and converts the staging-ready source into a real connected Dammam environment. It intentionally does not touch the legacy Vercel production deployment.
+This is the selected Phase 2B staging path:
+
+**Render Free → Neon PostgreSQL → Upstash Redis → Cloudflare R2**
+
+Unifonic provides OTP/SMS and Resend provides transactional password-reset email. Existing Supabase projects and the legacy Vercel production deployment are not modified. The GCP implementation remains available only as a future alternative.
 
 ## 1. Source gate — complete
 
-Current state:
+- Repository: `EslamElshikh-dev/thiqah-maintenance`
+- Staging branch: `feat/phase2-connected-staging`
+- PR #1 remains Draft.
+- Node.js is pinned to 24.x.
+- The committed lockfile contains the exact R2/S3 packages.
+- CI gates clean install, tests/syntax, and Docker image build.
+- `render.yaml` deploys only after GitHub checks pass.
 
-- repository exists at `EslamElshikh-dev/thiqah-maintenance`
-- Phase 2 remains isolated in `feat/phase2-connected-staging`
-- PR #1 remains Draft
-- `package-lock.json` is committed
-- Node.js 24 `npm ci` and application checks pass in GitHub Actions
-- production Docker image build passes in CI
-- no live credentials or customer data are committed
+## 2. Neon PostgreSQL
 
-Do not merge PR #1 solely to start infrastructure. Keep the source reviewable until connected staging is ready.
+Create a dedicated Thiqah staging database. Prefer a European region close to the Render Frankfurt service.
 
-## 2. CNTXT / GCP Dammam gate
+Keep two connection paths where practical:
 
-For a KSA-billed Google Cloud account, complete the applicable CNTXT onboarding/access path for Dammam `me-central2` first.
+1. **Migration/admin connection** — stored only in the protected GitHub environment `free-staging-db` as `NEON_DATABASE_URL_ADMIN`.
+2. **Runtime connection** — configured only in Render as `DATABASE_URL`. A least-privilege runtime role is preferred; using the database owner for production is not acceptable.
 
-All Thiqah staging data-plane resources remain in `me-central2`:
+Both URLs must require TLS.
 
-- Cloud Run API/jobs
-- Cloud SQL PostgreSQL
-- Memorystore Redis
-- private Cloud Storage media
-- Regional Secret Manager
-- regional application Logging bucket
+Run the manual GitHub workflow `Migrate Free Staging Database` and enter `MIGRATE`. The launcher lives on `main` but deliberately checks out `feat/phase2-connected-staging`, so the application PR can remain Draft while staging is prepared.
 
-Create the regional Terraform state bucket from a trusted operator environment:
+The workflow runs the checksum-protected migration runner and then verifies the `thiqah` schema, `thiqah.orders`, and migration ledger.
 
-```bash
-export GCP_PROJECT_ID="your-project"
-export TF_STATE_BUCKET="${GCP_PROJECT_ID}-thiqah-tfstate"
+## 3. Upstash Redis
 
-gcloud storage buckets create "gs://${TF_STATE_BUCKET}" \
-  --project="${GCP_PROJECT_ID}" \
-  --location=me-central2 \
-  --uniform-bucket-level-access \
-  --public-access-prevention \
-  --soft-delete-duration=30d
+Create a dedicated Redis database for Thiqah staging and configure its TLS `rediss://` URL in Render as `REDIS_URL`.
 
-gcloud storage buckets update "gs://${TF_STATE_BUCKET}" --versioning
-```
+The existing `ioredis` integration enforces TLS for `rediss://`, uses short connection/command timeouts, and is used for distributed rate limiting and session-related shared state.
 
-Then review and apply Terraform:
+Do not use instance-local memory as a persistence substitute.
 
-```bash
-cd infra/gcp/terraform
-cp backend.tf.example backend.tf
-cp backend.hcl.example backend.hcl
-cp staging.tfvars.example staging.tfvars
-# Fill project/account/repository values locally only.
-terraform init -backend-config=backend.hcl
-terraform fmt -check
-terraform validate
-terraform plan -var-file=staging.tfvars -out=staging.tfplan
-terraform show staging.tfplan
-# Apply only after manual review.
-terraform apply staging.tfplan
-```
+## 4. Cloudflare R2 private media
 
-Never commit `backend.hcl`, `staging.tfvars`, state, plans, or generated credentials.
+Create one private bucket dedicated to Thiqah staging. Do not enable a public bucket URL.
 
-## 3. Messaging provider gate
+Create an application token limited to the Thiqah bucket and the object operations required by the API, then configure these values only in Render:
 
-The code now contains tested direct adapters for:
+- `R2_ACCOUNT_ID`
+- `R2_BUCKET`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
 
-- Unifonic — SMS/OTP
-- Resend — transactional password-reset email
+Configure bucket CORS for the exact HTTPS frontend origin(s). Use `infra/free/r2-cors.example.json` as the reviewed template and replace the placeholder origin before applying it.
 
-Before selecting the direct adapters in a deployed environment:
+The application generates 10-minute signed PUT URLs and 5-minute signed GET URLs. Uploads are bound to the intended content type and `If-None-Match: *`; completion performs server-side size, file-signature and SHA-256 validation before inserting the media record.
 
-1. activate a Unifonic account and create an AppSid
-2. obtain approval for the actual Sender ID
-3. verify the Resend sender domain/address
-4. create a sending-only Resend API key
-5. store provider credentials only as Regional Secret Manager versions
+## 5. Unifonic and Resend
 
-Until the regional provider-secret loading switch is reviewed/applied, the deployed staging configuration remains on the existing Webhook adapters. Do not work around this by placing provider credentials in GitHub variables.
+### Unifonic
 
-## 4. Regional runtime secrets
+- Activate the SMS account/application.
+- Obtain an AppSid.
+- Use an approved Sender ID.
+- Configure `UNIFONIC_APPSID` and `SMS_SENDER_ID` only in Render.
+- Send one real Saudi staging OTP before accepting the integration.
 
-From a trusted operator environment authenticated to the staging GCP project:
+### Resend
 
-```bash
-export GCP_PROJECT_ID="your-project"
-export GCP_REGION="me-central2"
-export APP_ENV="staging"
-scripts/gcp/provision-runtime-secrets.sh
-```
+- Verify the staging sender/domain.
+- Create a sending-only API key.
+- Configure `RESEND_API_KEY` and `SUPPORT_FROM_EMAIL` only in Render.
+- Complete one real password-reset delivery and token-consumption test.
 
-For the one-time owner bootstrap, provide the temporary password and pre-generated TOTP seed only in the trusted operator shell. The protected bootstrap workflow must destroy those secret versions after success.
+## 6. Render Free API
 
-## 5. GitHub OIDC/WIF gate
+Create a Blueprint from repository `render.yaml`.
 
-Populate protected `staging` and `staging-bootstrap` GitHub environments using `docs/GITHUB_ENVIRONMENT_VARIABLES.md` and reviewed Terraform outputs.
+The committed Blueprint selects:
 
-No service-account JSON key, database password, Redis password, provider API key, AppSid, Vercel token, or runtime application secret belongs in GitHub.
+- Docker runtime
+- Frankfurt region
+- Free plan
+- `/health/ready` health check
+- staging branch
+- deploy only after GitHub checks pass
+- Neon URL database mode
+- Upstash Redis
+- R2 storage
+- Unifonic OTP
+- Resend email
 
-## 6. First connected deployment
+For every `sync:false` value, enter the value in Render's protected configuration UI. Never commit it to Git.
 
-After Terraform, WIF, secrets and provider endpoints are ready, merge the reviewed staging source as appropriate and run `Deploy Staging`.
+Render generates the application HMAC/encryption values declared with `generateValue: true`. Do not replace them with predictable strings.
 
-The workflow performs:
+Because Render Free can sleep when idle and does not provide the paid pre-deploy migration feature, migrations stay in the separate manual GitHub workflow. Run migrations before the first Render deployment that depends on a new schema.
 
-1. committed lockfile requirement
-2. `npm ci`
-3. unit/syntax/config gates
-4. GitHub OIDC -> GCP WIF
-5. immutable Docker build + SBOM/provenance
-6. push to Dammam Artifact Registry
-7. one-shot database release job
-8. Cloud Run staging API deploy using the same image digest
-9. `/health/live` and `/health/ready` smoke tests
+## 7. First connected sequence
 
-Do not bootstrap an owner until readiness passes.
-
-## 7. One-time owner bootstrap
-
-Run `Bootstrap Staging Owner` manually with `confirm=BOOTSTRAP` through the protected `staging-bootstrap` environment. After successful creation the workflow destroys the bootstrap password/TOTP secret versions and deletes the temporary Cloud Run Job.
-
-Verify MFA login and confirm no bootstrap credential versions remain usable.
+1. Create Neon and configure the protected migration connection.
+2. Run `Migrate Free Staging Database` and verify success.
+3. Create Upstash Redis.
+4. Create/configure the private R2 bucket and its CORS policy.
+5. Activate Unifonic and Resend.
+6. Create the Render Blueprint and fill protected runtime configuration.
+7. Let GitHub CI pass and Render deploy the reviewed branch.
+8. Verify `/health/live` and `/health/ready`.
+9. Exercise a real R2 upload/read lifecycle.
+10. Verify one OTP and one password-reset delivery.
+11. Bootstrap the owner exactly once with MFA and immediately remove the temporary bootstrap values.
 
 ## 8. Security acceptance before mobile work
 
 Complete `docs/PHASE2B_CONNECTED_STAGING_CHECKLIST.md`, including:
 
-- customer A cannot read/update customer B resources
-- technician can see only active assigned jobs
+- customer A cannot access customer B resources
+- technician sees only active assigned work
 - admin MFA and replay protection
-- CSRF protection on browser mutations
-- reset tokens are single-use and short-lived
-- tracking token cannot be enumerated from order number
-- rate limits on auth/OTP/tracking/order creation
-- upload signed URL cannot overwrite an existing object
-- uploaded bytes must match allowed magic bytes, size and SHA-256
-- account deletion revokes sessions and applies retention rules
-- database restore/PITR drill succeeds
+- CSRF enforcement
+- auth/OTP/tracking/order rate limits
+- one-time reset tokens
+- non-enumerable public tracking
+- R2 no-overwrite and file-integrity checks
+- account-deletion/session-revocation behavior
+- database recovery procedure
 
 Only then open the Capacitor Android/iOS release gate.
+
+## 9. Scope
+
+This free stack is approved for staging and limited pilot validation. Render Free sleep behavior, provider free-tier limits, operational support and recovery guarantees must be re-evaluated before a production launch.
