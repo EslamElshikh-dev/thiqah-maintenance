@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /customer-login
+
+Sitemap: https://thiqah-maintenance-sa.vercel.app/sitemap.xml

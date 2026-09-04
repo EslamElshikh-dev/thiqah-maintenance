@@ -51,26 +51,42 @@ function option(value, label) {
   return node;
 }
 
+function validCatalog(value) {
+  return value && Array.isArray(value.services) && value.services.length && Array.isArray(value.serviceAreas) && value.serviceAreas.length;
+}
+
+function renderCatalog(catalog, source) {
+  const selectedService = serviceSelect.value;
+  const selectedArea = areaSelect.value;
+  state.settings = catalog;
+  state.catalogSource = source;
+  serviceSelect.replaceChildren(option('', 'اختر نوع الخدمة'));
+  areaSelect.replaceChildren(option('', 'اختر الحي داخل الرياض'));
+  catalog.services.forEach((item) => serviceSelect.append(option(item.id, item.name_ar)));
+  catalog.serviceAreas.forEach((item) => areaSelect.append(option(item.id, `${item.name_ar} — ${item.city}`)));
+  if ([...serviceSelect.options].some((item) => item.value === selectedService)) serviceSelect.value = selectedService;
+  if ([...areaSelect.options].some((item) => item.value === selectedArea)) areaSelect.value = selectedArea;
+  orderSubmit.disabled = false;
+}
+
+function readCachedCatalog() {
+  try {
+    const cached = JSON.parse(localStorage.getItem('thiqah:catalog') || 'null');
+    if (!cached || Date.now() - cached.savedAt > 86_400_000 || !validCatalog(cached.data)) return null;
+    return cached.data;
+  } catch { return null; }
+}
+
 async function loadSettings() {
+  const cached = readCachedCatalog();
+  renderCatalog(cached || fallbackCatalog, cached ? 'cache' : 'fallback');
   try {
     const data = await request('/v1/settings');
-    state.settings = data;
-    state.catalogSource = 'api';
-    serviceSelect.replaceChildren(option('', 'اختر نوع الخدمة'));
-    areaSelect.replaceChildren(option('', 'اختر الحي'));
-    data.services.forEach((item) => serviceSelect.append(option(item.id, item.name_ar)));
-    data.serviceAreas.forEach((item) => areaSelect.append(option(item.id, `${item.name_ar} — ${item.city}`)));
-    orderSubmit.disabled = false;
+    if (!validCatalog(data)) throw new Error('INVALID_CATALOG');
+    renderCatalog(data, 'api');
+    localStorage.setItem('thiqah:catalog', JSON.stringify({ savedAt: Date.now(), data }));
     return true;
   } catch {
-    state.settings = fallbackCatalog;
-    state.catalogSource = 'fallback';
-    serviceSelect.replaceChildren(option('', 'اختر نوع الخدمة'));
-    areaSelect.replaceChildren(option('', 'اختر الحي داخل الرياض'));
-    fallbackCatalog.services.forEach((item) => serviceSelect.append(option(item.id, item.name_ar)));
-    fallbackCatalog.serviceAreas.forEach((item) => areaSelect.append(option(item.id, `${item.name_ar} — ${item.city}`)));
-    orderSubmit.disabled = false;
-    setMessage(orderMessage, 'يمكنك اختيار الخدمة والحي الآن؛ تُحفظ المسودة على جهازك لحين اتصال خدمة الطلبات.', 'success');
     return false;
   }
 }
