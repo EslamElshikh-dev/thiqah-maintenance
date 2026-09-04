@@ -1,0 +1,79 @@
+name: Bootstrap Staging Owner
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: Owner username
+        required: true
+        type: string
+      email:
+        description: Verified owner email
+        required: true
+        type: string
+      display_name:
+        description: Owner display name
+        required: true
+        type: string
+      confirm:
+        description: Type BOOTSTRAP to confirm the one-time action
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: thiqah-staging-owner-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    if: ${{ inputs.confirm == 'BOOTSTRAP' }}
+    runs-on: ubuntu-latest
+    environment: staging-bootstrap
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      GCP_MIGRATOR_SERVICE_ACCOUNT: ${{ vars.GCP_MIGRATOR_SERVICE_ACCOUNT }}
+      GCP_NETWORK: ${{ vars.GCP_NETWORK }}
+      GCP_SUBNETWORK: ${{ vars.GCP_SUBNETWORK }}
+      CLOUD_SQL_INSTANCE_CONNECTION_NAME: ${{ vars.CLOUD_SQL_INSTANCE_CONNECTION_NAME }}
+      MIGRATOR_IAM_DB_USER: ${{ vars.MIGRATOR_IAM_DB_USER }}
+      ADMIN_BOOTSTRAP_USERNAME: ${{ inputs.username }}
+      ADMIN_BOOTSTRAP_EMAIL: ${{ inputs.email }}
+      ADMIN_BOOTSTRAP_DISPLAY_NAME: ${{ inputs.display_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Authenticate to Google Cloud using OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Bootstrap exactly one staging owner
+        run: scripts/gcp/bootstrap-staging-owner.sh
+
+      - name: Destroy one-time bootstrap secret versions
+        run: |
+          set -euo pipefail
+          for suffix in admin-bootstrap-password admin-bootstrap-totp-secret; do
+            secret="thiqah-staging-${suffix}"
+            version="$(gcloud secrets versions list "$secret" --project="$GCP_PROJECT_ID" --location="$GCP_REGION" --filter='state=ENABLED' --sort-by='~createTime' --limit=1 --format='value(name)')"
+            version="${version##*/}"
+            test -n "$version"
+            gcloud secrets versions destroy "$version" --secret="$secret" --project="$GCP_PROJECT_ID" --location="$GCP_REGION" --quiet
+          done
+
+      - name: Remove one-time bootstrap job
+        run: gcloud run jobs delete thiqah-staging-owner-bootstrap --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --quiet

@@ -1,0 +1,43 @@
+import { hydrateRegionalSecrets } from './lib/regional-secrets.js';
+import { loadConfig } from './config.js';
+import { createDb } from './plugins/db.js';
+import { createRedis } from './plugins/redis.js';
+import { createStorageService } from './services/storage.js';
+import { createSmsProvider } from './services/sms.js';
+import { createEmailProvider } from './services/email.js';
+import { buildApp } from './app.js';
+
+if (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') {
+  await hydrateRegionalSecrets('runtime');
+}
+
+const config = loadConfig();
+const db = await createDb(config);
+const redis = createRedis(config);
+if (redis && redis.status === 'wait') await redis.connect();
+const storage = createStorageService(config);
+const sms = createSmsProvider(config);
+const email = createEmailProvider(config);
+const app = await buildApp({ config, db, redis, storage, sms, email });
+
+let shuttingDown = false;
+const shutdown = async (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  app.log.info({ signal }, 'shutting down');
+  const hardStop = setTimeout(() => process.exit(1), 25_000);
+  hardStop.unref();
+  try {
+    await app.close();
+    if (redis) redis.disconnect();
+    await db.close();
+    process.exit(0);
+  } catch (error) {
+    app.log.error({ name: error?.name, code: error?.code }, 'shutdown failed');
+    process.exit(1);
+  }
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+await app.listen({ host: '0.0.0.0', port: config.port });

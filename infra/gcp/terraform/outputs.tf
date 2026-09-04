@@ -1,0 +1,16 @@
+output "region" { value = var.region }
+output "network" { value = google_compute_network.main.name }
+output "subnetwork" { value = google_compute_subnetwork.main.name }
+output "database_private_ip" { value = google_sql_database_instance.postgres.private_ip_address }
+output "database_instance_connection_name" { value = google_sql_database_instance.postgres.connection_name }
+output "runtime_iam_db_user" { value = google_sql_user.api_iam.name }
+output "migrator_iam_db_user" { value = google_sql_user.migrator_iam.name }
+output "redis_host" { value = google_redis_instance.cache.host }
+output "redis_port" { value = google_redis_instance.cache.port }
+output "media_bucket" { value = google_storage_bucket.media.name }
+output "api_service_account" { value = google_service_account.api.email }
+output "migrator_service_account" { value = google_service_account.migrator.email }
+output "deploy_service_account" { value = google_service_account.deploy.email }
+output "artifact_repository" { value = google_artifact_registry_repository.api.repository_id }
+output "workload_identity_provider" { value = google_iam_workload_identity_pool_provider.github.name }
+output "regional_log_bucket" { value = google_logging_project_bucket_config.app.id }

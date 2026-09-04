@@ -1,0 +1,15 @@
+project_id                  = "replace-with-gcp-project-id"
+region                      = "me-central2"
+app_name                    = "thiqah"
+environment                 = "staging"
+github_repository           = "EslamElshikh-dev/thiqah-maintenance"
+github_repository_id        = "replace-after-private-repo-is-created"
+github_repository_owner_id  = "264218940"
+github_deploy_ref           = "refs/heads/main"
+db_version                  = "POSTGRES_17"
+db_edition                  = "ENTERPRISE"
+db_tier                     = "db-custom-2-7680"
+db_availability_type        = "ZONAL"
+redis_memory_gb             = 1
+redis_tier                  = "BASIC"
+log_retention_days          = 30
