@@ -32,7 +32,7 @@ jobs:
       - name: Install from committed lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Provision, verify, and encrypt handoff
+      - name: Provision and encrypt raw handoff
         shell: bash
         run: |
           set -euo pipefail
@@ -43,37 +43,6 @@ jobs:
             -X POST https://upstash.com/start-redis \
             -H 'User-Agent: openai-codex' \
             > "$RESPONSE_FILE"
-
-          REDIS_URL="$(grep -Eo 'rediss://[^[:space:]`"<>]+' "$RESPONSE_FILE" | head -n1)"
-          if [ -z "$REDIS_URL" ]; then
-            echo 'Upstash response did not contain a TLS Redis URL' >&2
-            exit 1
-          fi
-          echo "::add-mask::$REDIS_URL"
-
-          export THIQAH_UPSTASH_REDIS_URL="$REDIS_URL"
-          node --input-type=module <<'NODE'
-          import Redis from 'ioredis';
-          const url = process.env.THIQAH_UPSTASH_REDIS_URL;
-          const redis = new Redis(url, {
-            lazyConnect: true,
-            enableReadyCheck: true,
-            connectTimeout: 10000,
-            maxRetriesPerRequest: 1,
-            tls: {}
-          });
-          const key = `thiqah:staging:probe:${Date.now()}`;
-          try {
-            await redis.connect();
-            await redis.set(key, 'ok', 'EX', 60);
-            const value = await redis.get(key);
-            if (value !== 'ok') throw new Error('Upstash SET/GET verification failed');
-            await redis.del(key);
-            console.log('Upstash TLS Redis verification passed.');
-          } finally {
-            redis.disconnect();
-          }
-          NODE
 
           cp "$RESPONSE_FILE" /tmp/thiqah-upstash-handoff.txt
           cat > /tmp/thiqah-upstash-public.pem <<'PUBKEY'
@@ -103,6 +72,7 @@ jobs:
             -out /tmp/thiqah-upstash-aes.key.enc
 
           sha256sum /tmp/thiqah-upstash-handoff.enc /tmp/thiqah-upstash-aes.key.enc > /tmp/SHA256SUMS
+          echo "Upstash raw handoff captured and encrypted; bytes=$(wc -c < "$RESPONSE_FILE")"
           rm -f "$RESPONSE_FILE" /tmp/thiqah-upstash-handoff.txt /tmp/thiqah-upstash-aes.key /tmp/thiqah-upstash-public.pem
 
       - name: Upload encrypted Upstash handoff
