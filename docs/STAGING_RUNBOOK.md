@@ -1,33 +1,35 @@
 # Thiqah v1 staging runbook
 
-This runbook converts the Phase 2 source into a real connected staging environment. It intentionally does not touch the legacy Vercel production deployment.
+This runbook starts from the current GitHub state and converts the staging-ready source into a real connected Dammam environment. It intentionally does not touch the legacy Vercel production deployment.
 
-## 1. GitHub source gate
+## 1. Source gate — complete
 
-1. Create private repository `EslamElshikh-dev/thiqah-maintenance` with no starter README/license/gitignore.
-2. Record its immutable numeric GitHub repository ID.
-3. Generate `package-lock.json` on a trusted internet-connected machine using the exact `package.json`, then run:
+Current state:
 
-```bash
-npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-npm ci --ignore-scripts --no-audit --no-fund
-npm run check
-```
+- repository exists at `EslamElshikh-dev/thiqah-maintenance`
+- Phase 2 remains isolated in `feat/phase2-connected-staging`
+- PR #1 remains Draft
+- `package-lock.json` is committed
+- Node.js 24 `npm ci` and application checks pass in GitHub Actions
+- production Docker image build passes in CI
+- no live credentials or customer data are committed
 
-4. Commit the reviewed lockfile. Do not bypass the CI lockfile gate.
+Do not merge PR #1 solely to start infrastructure. Keep the source reviewable until connected staging is ready.
 
-## 2. GCP data-plane gate
+## 2. CNTXT / GCP Dammam gate
 
-All data-plane resources remain in `me-central2`:
+For a KSA-billed Google Cloud account, complete the applicable CNTXT onboarding/access path for Dammam `me-central2` first.
+
+All Thiqah staging data-plane resources remain in `me-central2`:
 
 - Cloud Run API/jobs
 - Cloud SQL PostgreSQL
 - Memorystore Redis
-- Cloud Storage media
+- private Cloud Storage media
 - Regional Secret Manager
-- regional app Logging bucket
+- regional application Logging bucket
 
-Create a regional Terraform state bucket first. Example operator commands:
+Create the regional Terraform state bucket from a trusted operator environment:
 
 ```bash
 export GCP_PROJECT_ID="your-project"
@@ -43,13 +45,14 @@ gcloud storage buckets create "gs://${TF_STATE_BUCKET}" \
 gcloud storage buckets update "gs://${TF_STATE_BUCKET}" --versioning
 ```
 
-Then:
+Then review and apply Terraform:
 
 ```bash
 cd infra/gcp/terraform
 cp backend.tf.example backend.tf
 cp backend.hcl.example backend.hcl
-# edit backend.hcl and staging.tfvars
+cp staging.tfvars.example staging.tfvars
+# Fill project/account/repository values locally only.
 terraform init -backend-config=backend.hcl
 terraform fmt -check
 terraform validate
@@ -59,68 +62,82 @@ terraform show staging.tfplan
 terraform apply staging.tfplan
 ```
 
-Never commit `backend.hcl`, state, plans, or generated credentials.
+Never commit `backend.hcl`, `staging.tfvars`, state, plans, or generated credentials.
 
-## 3. Regional secrets gate
+## 3. Messaging provider gate
 
-From a trusted operator workstation authenticated to the staging GCP project:
+The code now contains tested direct adapters for:
+
+- Unifonic — SMS/OTP
+- Resend — transactional password-reset email
+
+Before selecting the direct adapters in a deployed environment:
+
+1. activate a Unifonic account and create an AppSid
+2. obtain approval for the actual Sender ID
+3. verify the Resend sender domain/address
+4. create a sending-only Resend API key
+5. store provider credentials only as Regional Secret Manager versions
+
+Until the regional provider-secret loading switch is reviewed/applied, the deployed staging configuration remains on the existing Webhook adapters. Do not work around this by placing provider credentials in GitHub variables.
+
+## 4. Regional runtime secrets
+
+From a trusted operator environment authenticated to the staging GCP project:
 
 ```bash
 export GCP_PROJECT_ID="your-project"
 export GCP_REGION="me-central2"
 export APP_ENV="staging"
-
-# Supply the real provider endpoints separately; the script generates the
-# cryptographic/runtime tokens itself and reads Redis connection material.
 scripts/gcp/provision-runtime-secrets.sh
 ```
 
-For the one-time owner bootstrap, set a strong temporary password and a pre-generated TOTP secret only in the operator shell, run the provisioning script again to add those two versions, and clear shell/history according to your operator policy. The protected bootstrap workflow destroys those versions after success.
+For the one-time owner bootstrap, provide the temporary password and pre-generated TOTP seed only in the trusted operator shell. The protected bootstrap workflow must destroy those secret versions after success.
 
-## 4. GitHub OIDC gate
+## 5. GitHub OIDC/WIF gate
 
-Populate the `staging` and `staging-bootstrap` environments using `docs/GITHUB_ENVIRONMENT_VARIABLES.md`.
+Populate protected `staging` and `staging-bootstrap` GitHub environments using `docs/GITHUB_ENVIRONMENT_VARIABLES.md` and reviewed Terraform outputs.
 
-No `GOOGLE_APPLICATION_CREDENTIALS`, service-account JSON key, Vercel token, database password, Redis password, or runtime secret belongs in GitHub.
+No service-account JSON key, database password, Redis password, provider API key, AppSid, Vercel token, or runtime application secret belongs in GitHub.
 
-## 5. First connected deployment
+## 6. First connected deployment
 
-Push/merge the reviewed Phase 2 source and lockfile to `main`.
+After Terraform, WIF, secrets and provider endpoints are ready, merge the reviewed staging source as appropriate and run `Deploy Staging`.
 
-`Deploy Staging` then performs:
+The workflow performs:
 
-1. lockfile requirement
+1. committed lockfile requirement
 2. `npm ci`
 3. unit/syntax/config gates
 4. GitHub OIDC -> GCP WIF
 5. immutable Docker build + SBOM/provenance
 6. push to Dammam Artifact Registry
 7. one-shot database release job
-8. Cloud Run API deploy using the same image digest
+8. Cloud Run staging API deploy using the same image digest
 9. `/health/live` and `/health/ready` smoke tests
 
 Do not bootstrap an owner until readiness passes.
 
-## 6. One-time owner bootstrap
+## 7. One-time owner bootstrap
 
 Run `Bootstrap Staging Owner` manually with `confirm=BOOTSTRAP` through the protected `staging-bootstrap` environment. After successful creation the workflow destroys the bootstrap password/TOTP secret versions and deletes the temporary Cloud Run Job.
 
-Then verify MFA login and ensure no bootstrap credentials remain enabled.
+Verify MFA login and confirm no bootstrap credential versions remain usable.
 
-## 7. Security acceptance before mobile work
+## 8. Security acceptance before mobile work
 
-Before starting Android/iOS packaging, run the planned E2E/security suite against staging:
+Complete `docs/PHASE2B_CONNECTED_STAGING_CHECKLIST.md`, including:
 
 - customer A cannot read/update customer B resources
 - technician can see only active assigned jobs
-- admin state changes require MFA-authenticated session
+- admin MFA and replay protection
 - CSRF protection on browser mutations
 - reset tokens are single-use and short-lived
 - tracking token cannot be enumerated from order number
 - rate limits on auth/OTP/tracking/order creation
 - upload signed URL cannot overwrite an existing object
 - uploaded bytes must match allowed magic bytes, size and SHA-256
-- account deletion actually revokes sessions and handles media/retention as documented
-- database restore/PITR test succeeds
+- account deletion revokes sessions and applies retention rules
+- database restore/PITR drill succeeds
 
-Only then open the Capacitor/mobile release gate.
+Only then open the Capacitor Android/iOS release gate.
