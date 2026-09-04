@@ -19,6 +19,8 @@ services:
         value: url
       - key: DB_POOL_MAX
         value: "5"
+      - key: REDIS_MODE
+        value: rest
       - key: STORAGE_PROVIDER
         value: r2
       - key: OTP_PROVIDER
@@ -31,7 +33,9 @@ services:
         value: "604800"
       - key: DATABASE_URL
         sync: false
-      - key: REDIS_URL
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
       - key: PUBLIC_APP_ORIGINS
         sync: false
