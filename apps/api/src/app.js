@@ -91,7 +91,6 @@ export async function buildApp(ctx) {
     max: 120,
     timeWindow: '1 minute',
     ...rateLimitPersistence,
-    keyGenerator: (request) => request.ip,
     errorResponseBuilder: () => ({ ok: false, error: 'RATE_LIMITED', message: 'Too many requests' })
   });
 
