@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="90" y1="20" x2="1110" y2="610" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071c2c"/>
+      <stop offset="1" stop-color="#0b3d49"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="165" y1="125" x2="465" y2="505" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16b8a7"/>
+      <stop offset="1" stop-color="#08727a"/>
+    </linearGradient>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="45"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="210" cy="85" r="210" fill="#16b8a7" opacity=".12" filter="url(#glow)"/>
+  <circle cx="1060" cy="590" r="250" fill="#f5b642" opacity=".08" filter="url(#glow)"/>
+  <rect x="68" y="68" width="1064" height="494" rx="44" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="2"/>
+  <path d="M315 126 452 179v93c0 85-52 138-137 169-85-31-137-84-137-169v-93l137-53Z" fill="url(#shield)" stroke="#fff" stroke-width="14" stroke-linejoin="round"/>
+  <path d="m254 285 39 39 86-94" fill="none" stroke="#fff" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="800" y="270" fill="#fff" font-family="DejaVu Sans, sans-serif" font-size="72" font-weight="700" text-anchor="middle">ثقة التشغيل والصيانة</text>
+  <text x="800" y="350" fill="#b8d6d9" font-family="DejaVu Sans, sans-serif" font-size="28" text-anchor="middle">خدمة منزلية أوضح، وفني مناسب في الوقت المناسب</text>
+  <rect x="750" y="400" width="300" height="58" rx="29" fill="#fff" fill-opacity=".1" stroke="#fff" stroke-opacity=".18"/>
+  <text x="900" y="440" fill="#fff" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700" text-anchor="middle">الرياض، المملكة العربية السعودية</text>
+</svg>

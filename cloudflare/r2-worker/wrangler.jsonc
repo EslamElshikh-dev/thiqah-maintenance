@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "thiqah-staging-r2-broker",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "thiqah-staging-private-media"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://thiqah-staging-api.onrender.com,https://thiqah-maintenance-sa-preview.vercel.app"
+  }
+}

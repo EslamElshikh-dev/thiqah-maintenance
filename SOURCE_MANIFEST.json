@@ -1,0 +1,16 @@
+{
+  "version": "thiqah-v1-phase2-free-staging",
+  "status": "release-manifest-pending-connected-acceptance",
+  "previousSnapshot": {
+    "version": "thiqah-v1-phase2-staging-ready",
+    "fileCount": 93,
+    "sha256": "162c318b60035c2554115777b1b620c1d216d9a0cd4e1cb4d98f20f9d2bc71d6"
+  },
+  "integrityPolicy": {
+    "sourceOfTruth": "Git commit tree on feat/phase2-connected-staging",
+    "dependencyLock": "package-lock.json",
+    "ci": "Node.js 24 clean install, application checks, syntax gates and Docker build",
+    "releaseManifest": "Generate a fresh immutable per-file SHA-256 manifest only after connected free-staging acceptance passes."
+  },
+  "note": "The original 93-file Phase 2 SHA-256 manifest is intentionally not presented as current after the Render/Neon/R2/Upstash staging changes. This file prevents stale integrity metadata from being mistaken for the current source tree."
+}

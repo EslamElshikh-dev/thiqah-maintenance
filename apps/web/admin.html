@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#071c2c">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="api-base" content="/api">
+  <title>لوحة التحكم | ثقة</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.png" type="image/png">
+  <link rel="stylesheet" href="/admin.css?v=20260904-2">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-shield" viewBox="0 0 48 48"><path d="M24 4 42 11v12c0 11.2-6.8 18.2-18 22C12.8 41.2 6 34.2 6 23V11L24 4Z"/><path d="m16 24 5 5 11-12"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-order" viewBox="0 0 24 24"><path d="M7 3h10l3 3v15H4V6l3-3Z"/><path d="M8 11h8M8 15h6M9 3v4h6V3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a4 4 0 0 1 0 8M17 15a6 6 0 0 1 4 5.7"/></symbol>
+    <symbol id="i-access" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H4v16h6M14 8l4 4-4 4M8 12h10"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-9M15 6h6v6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-tool" viewBox="0 0 24 24"><path d="M14 6a4 4 0 0 0-5 5L3 17l4 4 6-6a4 4 0 0 0 5-5l-3 3-4-4 3-3Z"/></symbol>
+  </svg>
+
+  <section class="admin-login" id="login-screen">
+    <div class="login-brand-panel">
+      <a class="brand" href="/"><span class="brand-mark"><svg><use href="#i-shield"/></svg></span><span><b>ثقة</b><small>مركز العمليات</small></span></a>
+      <div class="login-copy"><span>إدارة موحّدة وآمنة</span><h1>كل طلب واضح.<br>كل صلاحية محسوبة.</h1><p>لوحة تشغيل يومية لمتابعة العملاء والطلبات والفنيين من أول البلاغ حتى إغلاق المهمة.</p></div>
+      <div class="login-proof"><span><svg><use href="#i-check"/></svg> جلسات مشفرة</span><span><svg><use href="#i-check"/></svg> صلاحيات حسب الدور</span><span><svg><use href="#i-check"/></svg> سجل تدقيق</span></div>
+    </div>
+    <div class="login-form-panel">
+      <a class="back-link" href="/"><svg><use href="#i-arrow"/></svg> العودة للموقع</a>
+      <form class="login-card" id="admin-login-form">
+        <span class="section-label">دخول الإدارة</span>
+        <h2>مرحبًا بعودتك</h2>
+        <p>أدخل بيانات حساب المدير للوصول إلى مركز العمليات.</p>
+        <div class="login-alert" id="login-message" role="status"></div>
+        <label>اسم المستخدم<input name="username" autocomplete="username" value="admin" required></label>
+        <label>كلمة المرور<input name="password" type="password" autocomplete="current-password" minlength="10" required></label>
+        <button class="primary-button" type="submit">دخول لوحة التحكم <svg><use href="#i-arrow"/></svg></button>
+        <small class="secure-note">محمي بجلسات مشفرة وتحديد صارم لمحاولات الدخول.</small>
+      </form>
+      <form class="login-card" id="mfa-form" hidden>
+        <span class="section-label">التحقق بخطوتين</span>
+        <h2>أدخل رمز المصادقة</h2>
+        <p>اكتب الرمز الحالي من تطبيق المصادقة المرتبط بالحساب.</p>
+        <div class="login-alert" id="mfa-message" role="status"></div>
+        <label>رمز التحقق<input class="otp-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></label>
+        <button class="primary-button" type="submit">تأكيد الدخول</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="dashboard" id="dashboard" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <a class="brand" href="/"><span class="brand-mark"><svg><use href="#i-shield"/></svg></span><span><b>ثقة</b><small>مركز العمليات</small></span></a>
+        <button class="icon-button sidebar-close" type="button" data-sidebar-close aria-label="إغلاق القائمة"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <nav class="side-nav" aria-label="التنقل الرئيسي">
+        <span>الرئيسية</span>
+        <button class="is-active" data-view="overview"><svg><use href="#i-grid"/></svg> نظرة عامة</button>
+        <span>التشغيل</span>
+        <button data-view="orders"><svg><use href="#i-order"/></svg> الطلبات <i id="orders-count">0</i></button>
+        <button data-view="customers"><svg><use href="#i-users"/></svg> العملاء</button>
+        <button data-view="access" data-permission="staff.manage"><svg><use href="#i-access"/></svg> الموظفون والصلاحيات</button>
+      </nav>
+      <div class="sidebar-status"><span></span><div><b>النظام يعمل</b><small>آخر فحص الآن</small></div></div>
+      <button class="logout-button" id="logout-button" type="button"><svg><use href="#i-logout"/></svg> تسجيل الخروج</button>
+    </aside>
+
+    <div class="sidebar-overlay" data-sidebar-close></div>
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <button class="icon-button menu-button" type="button" id="menu-button" aria-label="فتح القائمة"><svg><use href="#i-menu"/></svg></button>
+        <label class="global-search"><svg><use href="#i-search"/></svg><input id="global-search" type="search" placeholder="ابحث برقم طلب أو اسم عميل..."></label>
+        <div class="topbar-actions">
+          <span class="demo-badge" id="demo-badge" hidden>بيانات تجريبية</span>
+          <button class="icon-button notification-button" type="button" aria-label="الإشعارات"><svg><use href="#i-bell"/></svg><i></i></button>
+          <div class="admin-profile"><span id="profile-avatar">ص</span><div><b id="profile-name">صالح</b><small id="profile-role">مالك النظام</small></div></div>
+        </div>
+      </header>
+
+      <div class="content-shell">
+        <section class="view is-active" data-view-panel="overview">
+          <div class="page-heading">
+            <div><span id="today-label"></span><h1>هلا والله صالح <em>👋</em></h1><p>هذه خلاصة أداء ثقة وحركة الطلبات اليوم.</p></div>
+            <button class="primary-button add-account" type="button" data-open-account data-permission="staff.manage"><svg><use href="#i-plus"/></svg> إضافة حساب</button>
+          </div>
+
+          <div class="kpi-grid" id="kpi-grid">
+            <article class="kpi-card kpi-card--teal"><div class="kpi-icon"><svg><use href="#i-users"/></svg></div><span>إجمالي العملاء</span><strong data-kpi="customers_total">—</strong><small><i><svg><use href="#i-trend"/></svg></i> <b data-kpi="customers_month">—</b> عميل هذا الشهر</small></article>
+            <article class="kpi-card kpi-card--amber"><div class="kpi-icon"><svg><use href="#i-order"/></svg></div><span>طلبات اليوم</span><strong data-kpi="orders_today">—</strong><small>من أصل <b data-kpi="orders_total">—</b> طلب</small></article>
+            <article class="kpi-card kpi-card--blue"><div class="kpi-icon"><svg><use href="#i-clock"/></svg></div><span>قيد التنفيذ</span><strong data-kpi="orders_active">—</strong><small><b data-kpi="technicians_available">—</b> فني متاح الآن</small></article>
+            <article class="kpi-card kpi-card--green"><div class="kpi-icon"><svg><use href="#i-check"/></svg></div><span>نسبة الإنجاز</span><strong><b data-kpi="completion_rate">—</b><sup>%</sup></strong><small><b data-kpi="orders_completed">—</b> طلب مكتمل</small></article>
+          </div>
+
+          <div class="overview-grid">
+            <article class="panel trend-panel">
+              <header class="panel-head"><div><h2>حركة الطلبات</h2><p>آخر 7 أيام</p></div><span class="live-chip"><i></i> مباشر</span></header>
+              <div class="bar-chart" id="weekly-chart" aria-label="رسم حركة الطلبات خلال أسبوع"></div>
+            </article>
+            <article class="panel status-panel">
+              <header class="panel-head"><div><h2>حالة الطلبات</h2><p>التوزيع الإجمالي</p></div></header>
+              <div class="status-visual"><div class="donut" id="status-donut"><span><b data-kpi="orders_total">—</b><small>طلب</small></span></div><div class="status-legend" id="status-legend"></div></div>
+            </article>
+          </div>
+
+          <div class="overview-grid overview-grid--lower">
+            <article class="panel recent-orders-panel">
+              <header class="panel-head"><div><h2>أحدث الطلبات</h2><p>متابعة لحظية لمسار التنفيذ</p></div><button class="text-button" type="button" data-go-view="orders">عرض الكل <svg><use href="#i-arrow"/></svg></button></header>
+              <div class="table-wrap"><table><thead><tr><th>الطلب</th><th>العميل</th><th>الخدمة</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody id="recent-orders"></tbody></table></div>
+            </article>
+            <article class="panel service-panel">
+              <header class="panel-head"><div><h2>أداء الخدمات</h2><p>الأكثر طلبًا</p></div></header>
+              <div class="service-performance" id="service-performance"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="orders">
+          <div class="page-heading compact-heading"><div><span>إدارة التشغيل</span><h1>الطلبات</h1><p>راجع جميع الطلبات وحالات التنفيذ في مكان واحد.</p></div></div>
+          <article class="panel data-panel"><div class="panel-toolbar"><label><svg><use href="#i-search"/></svg><input type="search" data-table-search="orders" placeholder="بحث في الطلبات"></label><select id="order-status-filter"><option value="">كل الحالات</option><option value="new">جديد</option><option value="triage">تحت المراجعة</option><option value="assigned">تم الإسناد</option><option value="in_progress">قيد التنفيذ</option><option value="completed">مكتمل</option><option value="cancelled">ملغي</option></select></div><div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>العميل</th><th>رقم الجوال</th><th>الخدمة</th><th>الحالة</th><th>الموعد</th></tr></thead><tbody id="all-orders"></tbody></table></div></article>
+        </section>
+
+        <section class="view" data-view-panel="customers">
+          <div class="page-heading compact-heading"><div><span>قاعدة العملاء</span><h1>العملاء</h1><p>عرض العملاء المسجلين وآخر نشاط لهم.</p></div></div>
+          <article class="panel data-panel"><div class="panel-toolbar"><label><svg><use href="#i-search"/></svg><input type="search" data-table-search="customers" placeholder="بحث بالاسم أو الجوال"></label></div><div class="customer-grid" id="customer-grid"></div></article>
+        </section>
+
+        <section class="view" data-view-panel="access">
+          <div class="page-heading compact-heading"><div><span>التحكم بالوصول</span><h1>الموظفون والفنيون</h1><p>أنشئ الحسابات وحدد أقل صلاحيات لازمة لكل دور.</p></div><button class="primary-button" type="button" data-open-account><svg><use href="#i-plus"/></svg> إضافة حساب</button></div>
+          <div class="access-tabs"><button class="is-active" data-access-tab="employee">الموظفون <b id="staff-count">0</b></button><button data-access-tab="technician">الفنيون <b id="tech-count">0</b></button></div>
+          <div class="account-grid" id="account-grid"></div>
+        </section>
+      </div>
+    </main>
+
+    <nav class="mobile-nav" aria-label="تنقل الجوال">
+      <button class="is-active" data-view="overview"><svg><use href="#i-grid"/></svg><span>الرئيسية</span></button>
+      <button data-view="orders"><svg><use href="#i-order"/></svg><span>الطلبات</span></button>
+      <button data-view="customers"><svg><use href="#i-users"/></svg><span>العملاء</span></button>
+      <button data-view="access" data-permission="staff.manage"><svg><use href="#i-access"/></svg><span>الصلاحيات</span></button>
+    </nav>
+  </div>
+
+  <div class="modal" id="account-modal" aria-hidden="true">
+    <button class="modal-backdrop" type="button" data-close-account aria-label="إغلاق"></button>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="account-title">
+      <header><div><span class="section-label">حساب جديد</span><h2 id="account-title">إضافة موظف أو فني</h2></div><button class="icon-button" type="button" data-close-account aria-label="إغلاق"><svg><use href="#i-close"/></svg></button></header>
+      <div class="type-switch"><button class="is-active" type="button" data-account-type="employee"><svg><use href="#i-users"/></svg><span><b>موظف</b><small>إدارة العملاء والطلبات</small></span></button><button type="button" data-account-type="technician"><svg><use href="#i-tool"/></svg><span><b>فني</b><small>تنفيذ الطلبات المسندة</small></span></button></div>
+      <form id="account-form">
+        <input type="hidden" name="accountType" value="employee">
+        <div class="form-grid">
+          <label>الاسم الكامل<input name="displayName" autocomplete="name" minlength="2" maxlength="100" required></label>
+          <label data-employee-field>اسم المستخدم<input name="username" autocomplete="off" minlength="2" maxlength="100" required></label>
+          <label data-technician-field hidden>رقم الجوال<input name="phone" inputmode="tel" placeholder="05xxxxxxxx"></label>
+          <label>البريد الإلكتروني<input name="email" type="email" autocomplete="off"></label>
+          <label data-employee-field>الدور<select name="role"><option value="operator">مشغل طلبات</option><option value="support">خدمة عملاء</option><option value="finance">مالية وعروض أسعار</option><option value="admin">مدير تشغيل</option></select></label>
+          <label data-technician-field hidden>التخصص<input name="specialty" placeholder="مثل: تكييف وتبريد"></label>
+          <label class="full-field">كلمة المرور المؤقتة<input name="password" type="password" autocomplete="new-password" minlength="10" required><small>10 أحرف على الأقل، وتُرسل للمستخدم خارج النظام.</small></label>
+        </div>
+        <fieldset><legend>الصلاحيات</legend><p>اختر فقط ما يحتاجه الحساب لأداء عمله.</p><div class="permission-grid" id="permission-grid"></div></fieldset>
+        <div class="login-alert" id="account-message" role="status"></div>
+        <footer><button class="secondary-button" type="button" data-close-account>إلغاء</button><button class="primary-button" type="submit">إنشاء الحساب</button></footer>
+      </form>
+    </section>
+  </div>
+
+  <script type="module" src="/admin.js?v=20260904-2"></script>
+</body>
+</html>
