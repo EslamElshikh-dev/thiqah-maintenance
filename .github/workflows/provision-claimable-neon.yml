@@ -42,7 +42,7 @@ jobs:
           curl --fail --silent --show-error \
             -X POST https://neon.new/api/v1/database \
             -H 'Content-Type: application/json' \
-            -d '{"ref":"thiqah-staging-20260904-r3"}' \
+            -d '{"ref":"thiqah-staging-20260904-r4"}' \
             > "$RESPONSE_FILE"
 
           ADMIN_URL="$(jq -er '.connection_string' "$RESPONSE_FILE")"
@@ -98,15 +98,15 @@ jobs:
 
           cat > /tmp/thiqah-neon-public.pem <<'PUBKEY'
           -----BEGIN PUBLIC KEY-----
-          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEArhtMCLKmfjo0b7yJirlP
-          EhXj4jcrfTLSsPE0vtFXu5GMk1u/OA198UmJBMfWTvu5LIWN+1OSeLH/Y5+nqVI9
-          JHuQssUO76EexFK2U5hVzKeKhFZAC8RJRZFxT72Y5NEYoeLSxP3c//QlHqpYpVWQ
-          7qluCOq71UFsW4vcBuxtsYuAqQ4gPbIoYFRn64lW017yT7bhPWyY/1T8IsmjbHcw
-          y+ejH9SoOY2FPN/wMj0LjNrZ0sUKR2Q+rmW5UxnnkX3/XKZjOHnNDWdbllxAQYHz
-          7jJiKSXEPu1ZEYNIoH5RbXlCEMINyHEGIvB4e5cQLFal075RDb/E6SobMbDTwFGp
-          DDJecDLonqFK4JmmenLl9mV/rtCGpnVY5w+Qa/+jOIBxo2WukiSqDkE7Ktct1kio
-          rz+ktNvOwWCdRYu2qJn1K8GceskZBazfRO07lvp4uwmKjNdObXq1fzgi0cI/kfzj
-          uNPCiBLQkKY8nUQjMfxV4Se21kTT+yIoLd3bpQE2zW4NAgMBAAE=
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAw8jsg70Ve9zpY6uQkmPp
+          Ymv5CI2kzjoqnWz8YuTBXnn1mwsl21u2e3QbaofORUhdLD01Zg+83scLCM4mmoef
+          YsSjKRhESuSb1+GMhavHO6sYznHwnRkP9DSyxnCFRJeHTKIw22qjdazArGq1/azB
+          7xR8UXhW6T0uxF1HFO/nioX5cvzizs95leEwORFp17kMyU9EWveD9mMrzcoGmMzp
+          BFnWRGu3CGEAUqjKgLkOe8hmpRY2eZz2UnBo3vvpo44Mzqi2UzJKMMZhDHJb0DXL
+          uHqjY2ZeZWxCQZfWbWKwFtifr2tlMgS8K++L5v8Avg0PRywFtdSPUJ1IAqPkK2Mq
+          4pzI1kid5lYKU4eq/gCnfb6JDiOpg+tfqX72XMsJG8QGJFQoo1T2rVWlv5qkUCI1
+          11fVtCtzcE+FQOb8sIZs/hizASRZ9IwBfZQGPba4rLyN7WHsVyFLLzd1tktZpldT
+          mnbtRQzimC3m8mTYNppNwTQW6rwbYP3wHZzVaZgxUg4lAgMBAAE=
           -----END PUBLIC KEY-----
           PUBKEY
 
