@@ -19,3 +19,4 @@ jobs:
           node-version: 24
       - name: List Wrangler OAuth scopes
         run: npx -y wrangler@4.129.0 login --scopes-list
+      # One-shot inspection only; remove after scope selection.
