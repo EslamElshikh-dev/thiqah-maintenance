@@ -31,7 +31,6 @@ function integer(name, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}
   return value;
 }
 
-
 export function loadDatabaseConfig() {
   const nodeEnv = optional('NODE_ENV', 'development');
   const appEnv = optional('APP_ENV', nodeEnv === 'production' ? 'production' : 'development');
@@ -75,7 +74,9 @@ export function loadConfig() {
   const isDeployed = appEnv === 'staging' || isProduction;
   const publicAppOrigins = parseOrigins(optional('PUBLIC_APP_ORIGINS', optional('PUBLIC_APP_ORIGIN', 'http://localhost:3000')));
   const databaseMode = optional('DATABASE_MODE', 'url');
+  const storageProvider = optional('STORAGE_PROVIDER', 'gcs').toLowerCase();
   if (!['url', 'cloudsql-iam'].includes(databaseMode)) throw new Error('DATABASE_MODE must be url or cloudsql-iam');
+  if (!['gcs', 'r2'].includes(storageProvider)) throw new Error('STORAGE_PROVIDER must be gcs or r2');
 
   const config = {
     nodeEnv,
@@ -94,7 +95,7 @@ export function loadConfig() {
     cloudSqlIamDbUser: optional('CLOUD_SQL_IAM_DB_USER'),
     cloudSqlIpType: optional('CLOUD_SQL_IP_TYPE', 'PRIVATE').toUpperCase(),
     dbName: optional('DB_NAME', 'thiqah'),
-    dbPoolMax: integer('DB_POOL_MAX', isDeployed ? 5 : 5, { min: 1, max: 50 }),
+    dbPoolMax: integer('DB_POOL_MAX', 5, { min: 1, max: 50 }),
 
     redisUrl: optional('REDIS_URL'),
     redisCaCertBase64: optional('REDIS_CA_CERT_BASE64'),
@@ -107,18 +108,27 @@ export function loadConfig() {
     mfaEncryptionKeyBase64: required('MFA_ENCRYPTION_KEY_BASE64'),
     tokenEncryptionKeyBase64: required('TOKEN_ENCRYPTION_KEY_BASE64'),
 
-    gcsBucket: required('GCS_BUCKET'),
-    gcpProjectId: required('GCP_PROJECT_ID'),
+    storageProvider,
+    gcsBucket: optional('GCS_BUCKET'),
+    gcpProjectId: optional('GCP_PROJECT_ID'),
+    r2AccountId: optional('R2_ACCOUNT_ID'),
+    r2Bucket: optional('R2_BUCKET'),
+    r2AccessKeyId: optional('R2_ACCESS_KEY_ID'),
+    r2SecretAccessKey: optional('R2_SECRET_ACCESS_KEY'),
 
-    otpProvider: optional('OTP_PROVIDER', 'log'),
+    otpProvider: optional('OTP_PROVIDER', 'log').toLowerCase(),
     smsSenderId: optional('SMS_SENDER_ID', 'THIQAH'),
     smsWebhookUrl: optional('SMS_WEBHOOK_URL'),
     smsWebhookBearerToken: optional('SMS_WEBHOOK_BEARER_TOKEN'),
+    unifonicAppSid: optional('UNIFONIC_APPSID'),
+    unifonicBaseUrl: optional('UNIFONIC_BASE_URL', 'https://el.cloud.unifonic.com/rest/SMS/messages'),
 
-    emailProvider: optional('EMAIL_PROVIDER', 'log'),
+    emailProvider: optional('EMAIL_PROVIDER', 'log').toLowerCase(),
     supportFromEmail: optional('SUPPORT_FROM_EMAIL'),
     emailWebhookUrl: optional('EMAIL_WEBHOOK_URL'),
-    emailWebhookBearerToken: optional('EMAIL_WEBHOOK_BEARER_TOKEN')
+    emailWebhookBearerToken: optional('EMAIL_WEBHOOK_BEARER_TOKEN'),
+    resendApiKey: optional('RESEND_API_KEY'),
+    resendBaseUrl: optional('RESEND_BASE_URL', 'https://api.resend.com')
   };
 
   if (!['lax', 'strict', 'none'].includes(config.sessionCookieSameSite)) {
@@ -127,11 +137,27 @@ export function loadConfig() {
   if (!['PRIVATE', 'PUBLIC', 'PSC'].includes(config.cloudSqlIpType)) {
     throw new Error('CLOUD_SQL_IP_TYPE must be PRIVATE, PUBLIC, or PSC');
   }
+  if (!['log', 'webhook', 'unifonic'].includes(config.otpProvider)) {
+    throw new Error('OTP_PROVIDER must be log, webhook, or unifonic');
+  }
+  if (!['log', 'webhook', 'resend'].includes(config.emailProvider)) {
+    throw new Error('EMAIL_PROVIDER must be log, webhook, or resend');
+  }
+
   if (config.databaseMode === 'url') {
     if (!config.databaseUrl) throw new Error('DATABASE_URL is required when DATABASE_MODE=url');
   } else {
     required('CLOUD_SQL_INSTANCE_CONNECTION_NAME');
     required('CLOUD_SQL_IAM_DB_USER');
+  }
+
+  if (config.storageProvider === 'gcs') {
+    if (!config.gcsBucket) throw new Error('GCS_BUCKET is required when STORAGE_PROVIDER=gcs');
+    if (!config.gcpProjectId) throw new Error('GCP_PROJECT_ID is required when STORAGE_PROVIDER=gcs');
+  } else {
+    if (!config.r2AccountId || !config.r2Bucket || !config.r2AccessKeyId || !config.r2SecretAccessKey) {
+      throw new Error('R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required when STORAGE_PROVIDER=r2');
+    }
   }
 
   if (config.sessionHmacKey.length < 32 || config.piiHashKey.length < 32) {
@@ -151,16 +177,19 @@ export function loadConfig() {
     if (publicAppOrigins.some((origin) => !origin.startsWith('https://'))) {
       throw new Error('Staging/production public origins must use HTTPS');
     }
-    if (config.sessionCookieSameSite === 'none' && !isDeployed) {
-      throw new Error('SameSite=None requires a secure deployed environment');
-    }
   }
 
   if (config.otpProvider === 'webhook' && !config.smsWebhookUrl) {
     throw new Error('SMS_WEBHOOK_URL is required when OTP_PROVIDER=webhook');
   }
+  if (config.otpProvider === 'unifonic' && !config.unifonicAppSid) {
+    throw new Error('UNIFONIC_APPSID is required when OTP_PROVIDER=unifonic');
+  }
   if (config.emailProvider === 'webhook' && !config.emailWebhookUrl) {
     throw new Error('EMAIL_WEBHOOK_URL is required when EMAIL_PROVIDER=webhook');
+  }
+  if (config.emailProvider === 'resend' && !config.resendApiKey) {
+    throw new Error('RESEND_API_KEY is required when EMAIL_PROVIDER=resend');
   }
 
   return Object.freeze(config);
