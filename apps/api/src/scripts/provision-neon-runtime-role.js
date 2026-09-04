@@ -39,12 +39,12 @@ try {
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${RUNTIME_ROLE}') THEN
-        CREATE ROLE ${RUNTIME_ROLE} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+        CREATE ROLE ${RUNTIME_ROLE} LOGIN INHERIT;
       END IF;
     END
     $$;
   `);
-  await client.query(`ALTER ROLE ${RUNTIME_ROLE} INHERIT PASSWORD '${runtimePassword}'`);
+  await client.query(`ALTER ROLE ${RUNTIME_ROLE} LOGIN INHERIT PASSWORD '${runtimePassword}'`);
   await client.query(`GRANT thiqah_app TO ${RUNTIME_ROLE}`);
   await client.query('COMMIT');
 } catch (error) {
