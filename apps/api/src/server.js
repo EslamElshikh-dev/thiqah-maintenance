@@ -8,10 +8,11 @@ import { createSmsProvider } from './services/sms.js';
 import { createEmailProvider } from './services/email.js';
 import { buildApp } from './app.js';
 
-if (
-  (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') &&
-  process.env.SECRET_SOURCE === 'gcp-regional'
-) {
+const deployed = process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production';
+const gcpRegionalSecrets = process.env.SECRET_SOURCE === 'gcp-regional' || (
+  Boolean(process.env.REGIONAL_SECRET_LOCATION) && Boolean(process.env.REGIONAL_SECRET_PREFIX)
+);
+if (deployed && gcpRegionalSecrets) {
   await hydrateRegionalSecrets('runtime');
 }
 
