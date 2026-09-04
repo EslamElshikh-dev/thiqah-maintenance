@@ -1,5 +1,6 @@
 name: Bootstrap Cloudflare R2 (one-shot)
 
+# One-shot trigger commit. Delete this workflow after successful bootstrap.
 on:
   push:
     branches: [main]
