@@ -1,6 +1,6 @@
 # Phase 2B — Free connected staging checklist
 
-Selected stack: Render Free + Neon PostgreSQL + Cloudflare R2 + Upstash Redis.
+Selected stack: Render Free + Neon PostgreSQL + Cloudflare R2 + Render Key Value.
 
 ## A. Data and runtime services
 
@@ -8,7 +8,7 @@ Selected stack: Render Free + Neon PostgreSQL + Cloudflare R2 + Upstash Redis.
 - [ ] Keep the migration database connection in the protected GitHub `free-staging-db` environment.
 - [ ] Configure the Render runtime database connection separately.
 - [ ] Run `Migrate Free Staging Database` with `confirm=MIGRATE` and verify six or more checksum-tracked migrations.
-- [ ] Create a dedicated Upstash TLS Redis database and configure Render with its Redis URL.
+- [x] Create a dedicated internal Render Key Value instance and configure the API with its private Redis URL.
 - [ ] Create a private Cloudflare R2 bucket dedicated to Thiqah staging.
 - [ ] Restrict the R2 API token to the Thiqah bucket and required object operations only.
 - [ ] Configure R2 CORS only for approved HTTPS frontend origins and the required upload headers.

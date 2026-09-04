@@ -22,7 +22,7 @@ services:
       - key: DB_POOL_MAX
         value: "5"
       - key: REDIS_MODE
-        value: rest
+        value: tcp
       - key: STORAGE_PROVIDER
         value: r2
       - key: OTP_PROVIDER
@@ -37,9 +37,7 @@ services:
         value: https://thiqah-staging-api.onrender.com
       - key: DATABASE_URL
         sync: false
-      - key: UPSTASH_REDIS_REST_URL
-        sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
+      - key: REDIS_URL
         sync: false
       # Fail-closed core-staging sentinels. These are never used while
       # CORE_STAGING_MODE=true. Replace with real credentials, then set

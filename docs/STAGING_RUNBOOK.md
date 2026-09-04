@@ -2,7 +2,7 @@
 
 This is the selected Phase 2B staging path:
 
-**Render Free → Neon PostgreSQL → Upstash Redis → Cloudflare R2**
+**Render Free → Neon PostgreSQL → Render Key Value → Cloudflare R2**
 
 Unifonic provides OTP/SMS and Resend provides transactional password-reset email. Existing Supabase projects and the legacy Vercel production deployment are not modified. The GCP implementation remains available only as a future alternative.
 
@@ -31,9 +31,9 @@ Run the manual GitHub workflow `Migrate Free Staging Database` and enter `MIGRAT
 
 The workflow runs the checksum-protected migration runner and then verifies the `thiqah` schema, `thiqah.orders`, and migration ledger.
 
-## 3. Upstash Redis
+## 3. Render Key Value
 
-Create a dedicated Redis database for Thiqah staging and configure its TLS `rediss://` URL in Render as `REDIS_URL`.
+Create a dedicated internal-only Key Value instance for Thiqah staging in the same Frankfurt region and configure its private `redis://` URL in Render as `REDIS_URL`.
 
 The existing `ioredis` integration enforces TLS for `rediss://`, uses short connection/command timeouts, and is used for distributed rate limiting and session-related shared state.
 
@@ -84,7 +84,7 @@ The committed Blueprint selects:
 - staging branch
 - deploy only after GitHub checks pass
 - Neon URL database mode
-- Upstash Redis
+- Render Key Value
 - R2 storage
 - Unifonic OTP
 - Resend email
@@ -99,7 +99,7 @@ Because Render Free can sleep when idle and does not provide the paid pre-deploy
 
 1. Create Neon and configure the protected migration connection.
 2. Run `Migrate Free Staging Database` and verify success.
-3. Create Upstash Redis.
+3. Create Render Key Value.
 4. Create/configure the private R2 bucket and its CORS policy.
 5. Activate Unifonic and Resend.
 6. Create the Render Blueprint and fill protected runtime configuration.

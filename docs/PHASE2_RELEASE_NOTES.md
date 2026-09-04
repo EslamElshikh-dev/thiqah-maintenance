@@ -2,7 +2,7 @@
 
 Current release track: `thiqah-v1-phase2-free-staging`.
 
-This release does **not** modify or replace the legacy Vercel deployment. It prepares the clean v1 source for the selected staging path: Render Free + Neon PostgreSQL + Cloudflare R2 + Upstash Redis.
+This release does **not** modify or replace the legacy Vercel deployment. It prepares the clean v1 source for the selected staging path: Render Free + Neon PostgreSQL + Cloudflare R2 + Render Key Value.
 
 ## Core security and reliability foundation
 
@@ -21,7 +21,7 @@ This release does **not** modify or replace the legacy Vercel deployment. It pre
 
 - API: Render Free Docker service in Frankfurt.
 - Database: dedicated Neon PostgreSQL via TLS connection URL.
-- Shared Redis: dedicated Upstash Redis via `rediss://`.
+- Shared Redis: dedicated internal Render Key Value via `redis://`.
 - Media: private Cloudflare R2 bucket through the S3-compatible API.
 - R2 upload intents use short-lived signed PUT URLs and `If-None-Match: *` to prevent overwrite reuse.
 - Media completion streams the object server-side and validates size, magic bytes and SHA-256 before database registration.
@@ -56,7 +56,7 @@ The Dammam/GCP implementation remains in `infra/gcp/` as a future production opt
 ## Remaining external gates
 
 1. Create and connect the dedicated Neon staging database.
-2. Create and connect Upstash Redis.
+2. Verify the connected internal Render Key Value instance.
 3. Create/configure the private R2 bucket and its CORS policy.
 4. Activate Unifonic Sender ID/AppSid and pass a real OTP test.
 5. Verify the Resend sender and pass a real password-reset delivery test.

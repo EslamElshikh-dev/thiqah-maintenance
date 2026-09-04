@@ -44,7 +44,9 @@ try {
     END
     $$;
   `);
-  await client.query(`ALTER ROLE ${RUNTIME_ROLE} LOGIN INHERIT PASSWORD '${runtimePassword}'`);
+  // Roles must be created directly by the database owner, not through the
+  // Neon control plane, so they never inherit neon_superuser membership.
+  await client.query(`ALTER ROLE ${RUNTIME_ROLE} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '${runtimePassword}'`);
   await client.query(`GRANT thiqah_app TO ${RUNTIME_ROLE}`);
   await client.query('COMMIT');
 } catch (error) {
@@ -60,14 +62,21 @@ try {
   const role = (await runtime.query(`SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolinherit FROM pg_roles WHERE rolname = current_user`)).rows[0];
   if (!role || role.rolname !== RUNTIME_ROLE) throw new Error('Runtime role identity verification failed');
   if (role.rolsuper || role.rolcreatedb || role.rolcreaterole || !role.rolinherit) throw new Error('Runtime role has unsafe PostgreSQL role attributes');
+  const memberships = (await runtime.query(`
+    SELECT
+      pg_has_role(current_user, 'thiqah_app', 'MEMBER') AS app_member,
+      pg_has_role(current_user, 'neon_superuser', 'MEMBER') AS neon_superuser_member
+  `)).rows[0];
+  if (!memberships?.app_member || memberships.neon_superuser_member) throw new Error('Runtime role has unsafe PostgreSQL memberships');
   const privileges = (await runtime.query(`
     SELECT
       has_schema_privilege(current_user, 'thiqah', 'USAGE') AS schema_usage,
       has_schema_privilege(current_user, 'thiqah', 'CREATE') AS schema_create,
       has_table_privilege(current_user, 'thiqah.services', 'SELECT') AS services_select,
-      has_table_privilege(current_user, 'thiqah.orders', 'INSERT,UPDATE,SELECT') AS orders_rw
+      has_table_privilege(current_user, 'thiqah.orders', 'INSERT,UPDATE,SELECT') AS orders_rw,
+      has_table_privilege(current_user, 'thiqah.orders', 'DELETE') AS orders_delete
   `)).rows[0];
-  if (!privileges.schema_usage || privileges.schema_create || !privileges.services_select || !privileges.orders_rw) throw new Error('Runtime role privilege verification failed');
+  if (!privileges.schema_usage || privileges.schema_create || !privileges.services_select || !privileges.orders_rw || privileges.orders_delete) throw new Error('Runtime role privilege verification failed');
   console.log('Neon runtime role verified: least-privilege boundary passed.');
   console.log(`RUNTIME_DATABASE_HOST=${adminUrl.hostname}`);
   console.log(`RUNTIME_DATABASE_USER=${RUNTIME_ROLE}`);

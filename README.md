@@ -7,7 +7,7 @@ Security-first rebuild of **ثقة للصيانة المنزلية**. The legacy
 - Web/PWA and future Capacitor clients.
 - API: Node.js 24 + Fastify in a Docker container on Render Free, Frankfurt.
 - Database: dedicated Neon PostgreSQL over TLS.
-- Shared Redis: dedicated Upstash TLS Redis for distributed rate limiting and shared coordination.
+- Shared Redis: dedicated internal Render Key Value (Valkey) for distributed rate limiting and shared coordination.
 - Private order media: Cloudflare R2 with short-lived signed PUT/GET URLs, no-overwrite intent, and server-side size, magic-byte and SHA-256 verification.
 - OTP/SMS: direct Unifonic adapter.
 - Transactional password reset email: direct Resend adapter.
