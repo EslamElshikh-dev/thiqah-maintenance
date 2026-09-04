@@ -1,0 +1,21 @@
+name: Inspect Cloudflare Wrangler OAuth Scopes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/inspect-cloudflare-scopes.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Setup Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+      - name: List Wrangler OAuth scopes
+        run: npx -y wrangler@4.129.0 login --scopes-list
