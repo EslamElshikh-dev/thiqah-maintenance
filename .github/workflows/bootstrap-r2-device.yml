@@ -13,7 +13,7 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       EXPECTED_EMAIL: moqawel1215@gmail.com
       EXPECTED_ACCOUNT_ID: 79f5d5c07f586845c3ab35147edb7a6b
@@ -40,6 +40,11 @@ jobs:
         run: |
           set -euo pipefail
           echo "$PUBLIC_KEY_B64" | base64 -d > public.pem
+
+          seal() {
+            printf '%s' "$1" | openssl pkeyutl -encrypt -pubin -inkey public.pem \
+              -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 -w0
+          }
 
           echo "Starting Cloudflare device authorization."
           echo "Verification page: https://dash.cloudflare.com/oauth2/device"
@@ -92,10 +97,24 @@ jobs:
             --data-binary @worker-subdomain.json >/dev/null
 
           WORKER_URL="https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
-          for attempt in 1 2 3 4 5; do
-            if curl -fsS "${WORKER_URL}/health" >/dev/null; then break; fi
-            if [ "$attempt" -eq 5 ]; then echo "R2 broker health check failed"; exit 23; fi
-            sleep 3
+
+          # Emit the only recoverable secret handoff immediately after the
+          # Worker secret is accepted. Later DNS/TLS smoke failures must not
+          # destroy our ability to configure Render with the same key.
+          echo "R2_BROKER_URL=${WORKER_URL}"
+          echo "R2_BROKER_HMAC_SEALED=$(seal "$HMAC_KEY")"
+          echo "R2_BROKER_HANDOFF_READY=true"
+
+          for attempt in $(seq 1 20); do
+            if curl -fsS --connect-timeout 5 --max-time 10 "${WORKER_URL}/health" >/dev/null; then
+              echo "R2 broker TLS/health check: PASS"
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              echo "R2 broker health check failed after propagation window"
+              exit 23
+            fi
+            sleep 5
           done
 
           export HMAC_KEY WORKER_URL
@@ -136,16 +155,9 @@ jobs:
 
           const missing = await fetch(signed('HEAD'), { method: 'HEAD' });
           if (missing.status !== 404) throw new Error(`DELETE verification failed: ${missing.status}`);
-          console.log('R2 broker smoke lifecycle: PASS');
+          console.log('R2 broker smoke lifecycle: PASS')
           NODE
 
-          seal() {
-            printf '%s' "$1" | openssl pkeyutl -encrypt -pubin -inkey public.pem \
-              -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 -w0
-          }
-
-          echo "R2_BROKER_URL=${WORKER_URL}"
-          echo "R2_BROKER_HMAC_SEALED=$(seal "$HMAC_KEY")"
           echo "R2_BROKER_COMPLETE=true"
 
           rm -f public.pem user.json accounts.json subdomain.json subdomain-request.json worker-subdomain.json
