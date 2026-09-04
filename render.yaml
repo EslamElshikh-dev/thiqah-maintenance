@@ -9,7 +9,7 @@ services:
     dockerContext: .
     healthCheckPath: /health/ready
     maxShutdownDelaySeconds: 30
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production
