@@ -3,11 +3,15 @@ import { loadConfig } from './config.js';
 import { createDb } from './plugins/db.js';
 import { createRedis } from './plugins/redis.js';
 import { createStorageService } from './services/storage.js';
+import { createR2StorageService } from './services/storage-r2.js';
 import { createSmsProvider } from './services/sms.js';
 import { createEmailProvider } from './services/email.js';
 import { buildApp } from './app.js';
 
-if (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') {
+if (
+  (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') &&
+  process.env.SECRET_SOURCE === 'gcp-regional'
+) {
   await hydrateRegionalSecrets('runtime');
 }
 
@@ -15,7 +19,9 @@ const config = loadConfig();
 const db = await createDb(config);
 const redis = createRedis(config);
 if (redis && redis.status === 'wait') await redis.connect();
-const storage = createStorageService(config);
+const storage = config.storageProvider === 'r2'
+  ? createR2StorageService(config)
+  : createStorageService(config);
 const sms = createSmsProvider(config);
 const email = createEmailProvider(config);
 const app = await buildApp({ config, db, redis, storage, sms, email });
