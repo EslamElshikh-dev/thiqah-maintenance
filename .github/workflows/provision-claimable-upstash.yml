@@ -44,8 +44,8 @@ jobs:
             -H 'User-Agent: openai-codex' \
             > "$RESPONSE_FILE"
 
-          ENDPOINT="$(sed -n 's/^Endpoint:[[:space:]]*//p' "$RESPONSE_FILE" | head -n1)"
-          TOKEN="$(sed -n 's/^Token:[[:space:]]*//p' "$RESPONSE_FILE" | head -n1)"
+          ENDPOINT="$(sed -n -E 's/^\*\*Endpoint:\*\*[[:space:]]*//p' "$RESPONSE_FILE" | head -n1)"
+          TOKEN="$(sed -n -E 's/^\*\*Token:\*\*[[:space:]]*//p' "$RESPONSE_FILE" | head -n1)"
           case "$ENDPOINT" in
             https://*.upstash.io) ;;
             *) echo 'Upstash returned an invalid REST endpoint' >&2; exit 1 ;;
