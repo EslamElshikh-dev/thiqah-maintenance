@@ -1,6 +1,8 @@
 import Redis from 'ioredis';
+import { createUpstashRestRedis } from './upstash-rest-rate-limit.js';
 
 export function createRedis(config) {
+  if (config.redisMode === 'rest') return createUpstashRestRedis(config);
   if (!config.redisUrl) return null;
   const tls = config.redisUrl.startsWith('rediss://')
     ? {
