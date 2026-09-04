@@ -44,5 +44,11 @@ jobs:
       - name: Run checksum-verified migrations
         run: npm run migrate
 
+      - name: Provision and verify least-privilege Neon runtime role
+        env:
+          NEON_DATABASE_URL_ADMIN: ${{ secrets.NEON_DATABASE_URL_ADMIN }}
+          NEON_RUNTIME_DB_PASSWORD: ${{ secrets.NEON_RUNTIME_DB_PASSWORD }}
+        run: npm run provision:neon-runtime
+
       - name: Verify schema readiness
         run: node scripts/check-free-staging-db.mjs
