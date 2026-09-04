@@ -1,8 +1,12 @@
 # Phase 2B provider decision
 
-Staging defaults to direct provider integrations:
+Selected staging stack:
 
+- API runtime: Render Free
+- PostgreSQL: Neon
+- shared Redis: Upstash
+- private object storage: Cloudflare R2
 - SMS / OTP: Unifonic
-- Transactional email: Resend
+- transactional email: Resend
 
-Provider credentials are runtime secrets in Regional Secret Manager (`me-central2`) and are never committed to GitHub or injected as plaintext GitHub secrets. Webhook adapters remain available only as an explicit fallback.
+Provider/runtime values are configured only in the relevant protected service settings. They are never committed to Git or exposed through public frontend environment variables. Webhook messaging adapters and the GCP infrastructure remain available only as optional fallback/future paths.
