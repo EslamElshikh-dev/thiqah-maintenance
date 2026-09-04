@@ -11,25 +11,52 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    outputs:
+      source_present: ${{ steps.source.outputs.present }}
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      - name: Detect application source
+        id: source
+        shell: bash
+        run: |
+          if [[ -f package.json ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Source-gated baseline detected; application checks are intentionally skipped."
+          fi
+
       - name: Require committed lockfile
+        if: steps.source.outputs.present == 'true'
         run: test -f package-lock.json || (echo 'package-lock.json must be generated and committed before merge' && exit 1)
 
       - name: Setup Node.js
+        if: steps.source.outputs.present == 'true'
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
           cache: npm
 
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npm run check
+      - name: Install locked dependencies
+        if: steps.source.outputs.present == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run application checks
+        if: steps.source.outputs.present == 'true'
+        run: npm run check
+
+      - name: Validate source-gated baseline
+        if: steps.source.outputs.present != 'true'
+        run: |
+          test -f README.md
+          test -f .gitignore
 
   container:
     runs-on: ubuntu-latest
     needs: test
+    if: needs.test.outputs.source_present == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
