@@ -42,7 +42,7 @@ jobs:
           curl --fail --silent --show-error \
             -X POST https://neon.new/api/v1/database \
             -H 'Content-Type: application/json' \
-            -d '{"ref":"thiqah-staging-20260904-r2"}' \
+            -d '{"ref":"thiqah-staging-20260904-r3"}' \
             > "$RESPONSE_FILE"
 
           ADMIN_URL="$(jq -er '.connection_string' "$RESPONSE_FILE")"
