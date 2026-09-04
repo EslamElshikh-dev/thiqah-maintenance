@@ -1,0 +1,137 @@
+name: Bootstrap Cloudflare R2 (one-shot)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/bootstrap-r2-device.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      EXPECTED_EMAIL: moqawel1215@gmail.com
+      R2_BUCKET: thiqah-staging-private-media
+      WRANGLER_SEND_METRICS: "false"
+      PUBLIC_KEY_B64: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQ0lqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FnOEFNSUlDQ2dLQ0FnRUFwdk90b2RFT2h6a2w5Ukc1QjNIUwpJU3I0WjdQZUc3aDZkTXFkNnNlS2EzUU90bkFXUWVHaWFEVXFnRnVZUlpuc3REZzBuais5V1VyV2Z3b0VqSkdxClFPbXN6clJRRUo3QnF2V21kV3hoUnNlY3liTlVocjkwdzZiMTJYUjhjbjBRR285K3lZUWhqRUtJTzhtRFFNNzkKMkVTWVBrbjlTWkVUaG9uZ3loRVVPTEloUTNBYzVHTzJON2I0TjRPYS8zQnBOc2R2ZGdIUGVEV2JWOFFpVi9XMApJZ0haQTVzNWhldGphS1NaMEJjYXZQbC9sYUM2ZUFzTXlRbmZNYi83MkJiRk44SWdnSGRVWThsQjVnL1RkbDN6CkZRUHp6R3hnaXFIamJYUkRKMGpWOHg3MWh5dHhyaGlPeEtBQ1hMUnIvRDNXNjlMYVhpRkFHU1Iwa1o2c1ZKTmoKa1IxdzNHcSt3eGk0NTBVZ2N3dm90aGtiU3h0bGFZbWNqOTEyb2E4ODFmaWIwOGM2WDVmQzgvOGptZURUYkNJVQpxWERHM2VoellDQXZpdlk0cjUxQkI2bnhkWktyeGU4c1JnTU01NXJic3YwYmVTUDJhbGNiNFhYVHdPRXAzLzNzCmVLYTh2RTRuaWY1Q202RUl2VGJMdkxnNllDdHBLb2VZdTNuQlhSMzdVaVQ5K3NudGs5L0ZUMGVQSWtGK3ppa2sKYkY0L0cyUVBnQmRrWE40TUptekNxRUw3TWs5ckJGS3JtTzdxL0hQOHJSWnlZTzNpQ0YwYURiam9wYUFYN1hLcApTeHBBY05PUlpEaHhabUNWbXZwWDkyYUpocjg2ZDFGenNMYmlUZ1g5NmZZUHdMMk51Tk5hYmFzWDNJdmxzQ3FaCmI3TzhtK3VLVyt0bEo1N3VaZGRQOUs4Q0F3RUFBUT09Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4.119.0
+
+      - name: Authorize Cloudflare and provision R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$PUBLIC_KEY_B64" | base64 -d > public.pem
+
+          echo "Starting Cloudflare device authorization."
+          wrangler login --device --browser=false --no-use-keyring
+
+          AUTH_JSON="$(wrangler auth token --json)"
+          CF_TOKEN="$(printf '%s' "$AUTH_JSON" | jq -r '.token')"
+          test -n "$CF_TOKEN" && test "$CF_TOKEN" != "null"
+
+          curl -fsS https://api.cloudflare.com/client/v4/user \
+            -H "Authorization: Bearer $CF_TOKEN" > user.json
+          EMAIL="$(jq -r '.result.email // empty' user.json)"
+          if [ "$EMAIL" != "$EXPECTED_EMAIL" ]; then
+            echo "Authenticated Cloudflare email does not match the expected account. Aborting safely."
+            wrangler logout || true
+            exit 21
+          fi
+
+          curl -fsS 'https://api.cloudflare.com/client/v4/accounts?per_page=50' \
+            -H "Authorization: Bearer $CF_TOKEN" > accounts.json
+          COUNT="$(jq '.result | length' accounts.json)"
+          if [ "$COUNT" -ne 1 ]; then
+            echo "Expected exactly one Cloudflare account; found $COUNT. Aborting to avoid provisioning in the wrong account."
+            jq -r '.result[] | "Account: \(.name) [\(.id)]"' accounts.json
+            wrangler logout || true
+            exit 22
+          fi
+          ACCOUNT_ID="$(jq -r '.result[0].id' accounts.json)"
+
+          if ! wrangler r2 bucket create "$R2_BUCKET" --location weur; then
+            wrangler r2 bucket list | grep -F "$R2_BUCKET" >/dev/null
+          fi
+          wrangler r2 bucket dev-url disable "$R2_BUCKET" --force || true
+
+          cat > cors.json <<'JSON'
+          {
+            "rules": [
+              {
+                "allowed": {
+                  "origins": [
+                    "https://thiqah-staging-api.onrender.com",
+                    "https://thiqah-maintenance-sa-preview.vercel.app"
+                  ],
+                  "methods": ["GET", "PUT", "HEAD"],
+                  "headers": ["content-type", "if-none-match"]
+                },
+                "exposeHeaders": ["etag"],
+                "maxAgeSeconds": 3600
+              }
+            ]
+          }
+          JSON
+          wrangler r2 bucket cors set "$R2_BUCKET" --file cors.json --force
+          wrangler r2 bucket cors list "$R2_BUCKET"
+
+          curl -fsS https://api.cloudflare.com/client/v4/user/tokens/permission_groups \
+            -H "Authorization: Bearer $CF_TOKEN" > groups.json
+          GROUP_ID="$(jq -r '.result[] | select(.name=="Workers R2 Storage Bucket Item Write") | .id' groups.json | head -n1)"
+          if [ -z "$GROUP_ID" ]; then
+            echo "Could not resolve the R2 Object Read/Write permission group."
+            wrangler logout || true
+            exit 23
+          fi
+
+          RESOURCE="com.cloudflare.edge.r2.bucket.${ACCOUNT_ID}_default_${R2_BUCKET}"
+          jq -n \
+            --arg name "thiqah-staging-r2-${GITHUB_RUN_ID}" \
+            --arg group "$GROUP_ID" \
+            --arg resource "$RESOURCE" \
+            '{name:$name, policies:[{effect:"allow", permission_groups:[{id:$group}], resources:{($resource):"*"}}]}' \
+            > token-request.json
+
+          curl -fsS https://api.cloudflare.com/client/v4/user/tokens \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @token-request.json > token-response.json
+
+          if [ "$(jq -r '.success' token-response.json)" != "true" ]; then
+            echo "R2 API token creation failed."
+            jq '{errors,messages}' token-response.json
+            wrangler logout || true
+            exit 24
+          fi
+
+          ACCESS_KEY_ID="$(jq -r '.result.id' token-response.json)"
+          TOKEN_VALUE="$(jq -r '.result.value' token-response.json)"
+          SECRET_ACCESS_KEY="$(printf '%s' "$TOKEN_VALUE" | sha256sum | awk '{print $1}')"
+
+          seal() {
+            printf '%s' "$1" | openssl pkeyutl -encrypt -pubin -inkey public.pem \
+              -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 -w0
+          }
+
+          echo "R2_HANDOFF_ACCOUNT_ID=$(seal "$ACCOUNT_ID")"
+          echo "R2_HANDOFF_BUCKET=$(seal "$R2_BUCKET")"
+          echo "R2_HANDOFF_ACCESS_KEY_ID=$(seal "$ACCESS_KEY_ID")"
+          echo "R2_HANDOFF_SECRET_ACCESS_KEY=$(seal "$SECRET_ACCESS_KEY")"
+          echo "R2_BOOTSTRAP_COMPLETE=true"
+
+          rm -f user.json accounts.json groups.json token-request.json token-response.json cors.json public.pem
+          unset CF_TOKEN TOKEN_VALUE SECRET_ACCESS_KEY ACCESS_KEY_ID ACCOUNT_ID
+          wrangler logout || true
