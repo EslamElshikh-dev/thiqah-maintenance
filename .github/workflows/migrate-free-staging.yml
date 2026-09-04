@@ -27,8 +27,10 @@ jobs:
       DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_ADMIN }}
       DB_POOL_MAX: '1'
     steps:
-      - name: Checkout
+      - name: Checkout reviewed staging branch
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: feat/phase2-connected-staging
 
       - name: Setup Node.js 24
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
