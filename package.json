@@ -12,6 +12,7 @@
     "start:api": "node apps/api/src/server.js",
     "bootstrap:admin": "node apps/api/src/scripts/bootstrap-admin.js",
     "migrate": "node apps/api/src/scripts/migrate.js",
+    "provision:neon-runtime": "node apps/api/src/scripts/provision-neon-runtime-role.js",
     "grant:runtime-role": "node apps/api/src/scripts/grant-runtime-role.js",
     "verify:staging": "node scripts/verify-staging-config.mjs",
     "release:db": "node apps/api/src/scripts/release-db.js",
