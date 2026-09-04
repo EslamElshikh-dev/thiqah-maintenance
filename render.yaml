@@ -15,6 +15,8 @@ services:
         value: production
       - key: APP_ENV
         value: staging
+      - key: CORE_STAGING_MODE
+        value: "true"
       - key: DATABASE_MODE
         value: url
       - key: DB_POOL_MAX
@@ -31,30 +33,33 @@ services:
         value: lax
       - key: SESSION_TTL_SECONDS
         value: "604800"
+      - key: PUBLIC_APP_ORIGINS
+        value: https://thiqah-staging-api.onrender.com
       - key: DATABASE_URL
         sync: false
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-      - key: PUBLIC_APP_ORIGINS
-        sync: false
+      # Fail-closed core-staging sentinels. These are never used while
+      # CORE_STAGING_MODE=true. Replace with real credentials, then set
+      # CORE_STAGING_MODE=false to activate the full dependency set.
       - key: R2_ACCOUNT_ID
-        sync: false
+        value: not-configured
       - key: R2_BUCKET
-        sync: false
+        value: not-configured
       - key: R2_ACCESS_KEY_ID
-        sync: false
+        value: not-configured
       - key: R2_SECRET_ACCESS_KEY
-        sync: false
+        value: not-configured
       - key: UNIFONIC_APPSID
-        sync: false
+        value: not-configured
       - key: SMS_SENDER_ID
-        sync: false
+        value: THIQAH
       - key: RESEND_API_KEY
-        sync: false
+        value: not-configured
       - key: SUPPORT_FROM_EMAIL
-        sync: false
+        value: staging-disabled@invalid.example
       - key: SESSION_HMAC_KEY
         generateValue: true
       - key: PII_HASH_KEY
