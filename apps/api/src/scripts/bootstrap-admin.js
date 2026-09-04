@@ -10,10 +10,11 @@ const required = (name) => {
   return value;
 };
 
-if (
-  (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') &&
-  process.env.SECRET_SOURCE === 'gcp-regional'
-) {
+const deployed = process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production';
+const gcpRegionalSecrets = process.env.SECRET_SOURCE === 'gcp-regional' || (
+  Boolean(process.env.REGIONAL_SECRET_LOCATION) && Boolean(process.env.REGIONAL_SECRET_PREFIX)
+);
+if (deployed && gcpRegionalSecrets) {
   await hydrateRegionalSecrets('bootstrap');
 }
 
@@ -49,7 +50,7 @@ try {
       [admin.id, encrypted]
     );
   });
-  console.log('Owner created once. Delete bootstrap password and TOTP secret versions immediately.');
+  console.log('Owner created once. Delete bootstrap password and TOTP values immediately.');
   if (!dbConfig.isDeployed && !suppliedTotp) console.log(`DEV_TOTP_SECRET=${secret}`);
 } finally {
   await db.close();
