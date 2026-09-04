@@ -10,7 +10,10 @@ const required = (name) => {
   return value;
 };
 
-if (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') {
+if (
+  (process.env.APP_ENV === 'staging' || process.env.APP_ENV === 'production') &&
+  process.env.SECRET_SOURCE === 'gcp-regional'
+) {
   await hydrateRegionalSecrets('bootstrap');
 }
 
