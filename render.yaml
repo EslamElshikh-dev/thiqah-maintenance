@@ -33,6 +33,8 @@ services:
         value: lax
       - key: SESSION_TTL_SECONDS
         value: "604800"
+      - key: ADMIN_MFA_REQUIRED
+        value: "false"
       - key: PUBLIC_APP_ORIGINS
         value: https://thiqah-staging-api.onrender.com
       - key: DATABASE_URL

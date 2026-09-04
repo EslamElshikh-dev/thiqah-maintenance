@@ -29,10 +29,11 @@ export async function authRoutes(app, ctx) {
     const result=await customerLogin({db,config,input,context:requestContext(config,request)});
     return sessionResponse(reply,config,result,input.clientType);
   });
-  app.post('/v1/auth/admin/login',{config:{rateLimit:{max:5,timeWindow:'15 minutes'}}}, async (request) => {
-    const result=await adminPasswordLogin({db,config,input:request.body||{}});
+  app.post('/v1/auth/admin/login',{config:{rateLimit:{max:5,timeWindow:'15 minutes'}}}, async (request,reply) => {
+    const input={...(request.body||{}),clientType:request.body?.clientType||'web'};
+    const result=await adminPasswordLogin({db,config,input,context:requestContext(config,request)});
     if (result.mfaRequired) return {ok:true,mfaRequired:true,challengeToken:result.challengeToken,expiresAt:result.expiresAt};
-    return {ok:false,error:'MFA enrollment required'};
+    return sessionResponse(reply,config,result,input.clientType);
   });
   app.post('/v1/auth/admin/mfa/verify',{config:{rateLimit:{max:8,timeWindow:'15 minutes'}}}, async (request,reply) => {
     const input={...(request.body||{}),clientType:request.body?.clientType||'web'};

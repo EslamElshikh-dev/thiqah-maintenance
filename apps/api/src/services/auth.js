@@ -53,7 +53,7 @@ export async function customerLogin({ db, config, input, context }) {
   return { actor:{id:row.id,name:row.name,phone:row.phone,email:row.email,status:row.status},session };
 }
 
-export async function adminPasswordLogin({ db, config, input }) {
+export async function adminPasswordLogin({ db, config, input, context }) {
   const username = requireString(input.username,'username',{min:2,max:100}).toLowerCase();
   const result = await db.query(
     `SELECT a.id,a.username,a.display_name,a.email,a.password_hash,a.role,a.status,a.mfa_required,m.totp_secret_ciphertext
@@ -63,8 +63,8 @@ export async function adminPasswordLogin({ db, config, input }) {
   );
   const row = result.rows[0];
   if (!row || row.status !== 'active' || !await verifyPassword(input.password,row.password_hash)) throw unauthorized('Invalid credentials');
-  if (config.isDeployed && (!row.mfa_required || !row.totp_secret_ciphertext)) throw unauthorized('Administrator MFA enrollment required');
-  if (row.mfa_required && row.totp_secret_ciphertext) {
+  if (config.adminMfaRequired && (!row.mfa_required || !row.totp_secret_ciphertext)) throw unauthorized('Administrator MFA enrollment required');
+  if (config.adminMfaRequired) {
     const token = randomToken(32);
     const tokenHash = hmacHex(config.sessionHmacKey,token);
     const challenge = await db.query(
@@ -74,7 +74,9 @@ export async function adminPasswordLogin({ db, config, input }) {
     );
     return { mfaRequired:true, challengeToken:token, expiresAt:challenge.rows[0].expires_at };
   }
-  return { mfaRequired:false, actor:row };
+  const actor={id:row.id,username:row.username,display_name:row.display_name,email:row.email,role:row.role,status:row.status};
+  const session=await createSession({db,config,actorType:'admin',actorId:row.id,clientType:input.clientType||'web',context});
+  return {mfaRequired:false,actor,session};
 }
 
 export async function verifyAdminMfa({ db, config, input, context }) {

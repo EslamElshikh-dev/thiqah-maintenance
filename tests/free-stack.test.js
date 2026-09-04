@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../apps/api/src/config.js';
+import { adminPasswordLogin } from '../apps/api/src/services/auth.js';
+import { hashPassword } from '../apps/api/src/lib/crypto.js';
 import { createR2StorageService } from '../apps/api/src/services/storage-r2.js';
 
 function withEnv(values, fn) {
@@ -32,6 +34,7 @@ test('free staging config uses Neon URL, Upstash Redis and R2 without GCP requir
     REDIS_URL: 'rediss://default:pass@example.upstash.io:6379',
     SESSION_HMAC_KEY: 's'.repeat(64),
     PII_HASH_KEY: 'p'.repeat(64),
+    ADMIN_MFA_REQUIRED: 'false',
     MFA_ENCRYPTION_KEY_BASE64: base64Key,
     TOKEN_ENCRYPTION_KEY_BASE64: base64Key,
     STORAGE_PROVIDER: 'r2',
@@ -54,7 +57,40 @@ test('free staging config uses Neon URL, Upstash Redis and R2 without GCP requir
     assert.equal(config.gcpProjectId, '');
     assert.equal(config.gcsBucket, '');
     assert.match(config.redisUrl, /^rediss:\/\//);
+    assert.equal(config.adminMfaRequired, false);
+    process.env.APP_ENV = 'production';
+    assert.throws(() => loadConfig(), /ADMIN_MFA_REQUIRED=false is forbidden in production/);
   });
+});
+
+test('staging password-only admin login creates a session without an MFA challenge', async () => {
+  const testPassword = 'ValidTestPassword123#';
+  const passwordHash = await hashPassword(testPassword);
+  let sessionCreated = false;
+  const db = {
+    async query(sql) {
+      if (sql.includes('FROM thiqah.admins')) return {rows:[{
+        id:'550e8400-e29b-41d4-a716-446655440000',username:'admin',display_name:'صالح',
+        email:'owner@example.com',password_hash:passwordHash,role:'owner',status:'active',
+        mfa_required:true,totp_secret_ciphertext:'configured'
+      }]};
+      if (sql.includes('INSERT INTO thiqah.auth_sessions')) {
+        sessionCreated = true;
+        return {rows:[]};
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  const result = await adminPasswordLogin({
+    db,
+    config:{adminMfaRequired:false,sessionHmacKey:'s'.repeat(64),sessionTtlSeconds:3600},
+    input:{username:'admin',password:testPassword,clientType:'web'},
+    context:{userAgentHash:'ua',ipPrefixHash:'ip'}
+  });
+  assert.equal(result.mfaRequired,false);
+  assert.equal(result.actor.username,'admin');
+  assert.equal(sessionCreated,true);
+  assert.ok(result.session.token);
 });
 
 test('R2 upload intent is private, content-type bound, non-overwriting and short lived', async () => {

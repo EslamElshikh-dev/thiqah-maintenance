@@ -31,6 +31,14 @@ function integer(name, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}
   return value;
 }
 
+function boolean(name, fallback) {
+  const value = process.env[name];
+  if (value === undefined || value === '') return fallback;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`${name} must be true or false`);
+}
+
 function validateUpstashRestUrl(value) {
   if (!value) return;
   const url = new URL(value);
@@ -113,6 +121,7 @@ export function loadConfig() {
     sessionCookieName: optional('SESSION_COOKIE_NAME', 'thiqah_session'),
     sessionCookieSameSite: optional('SESSION_COOKIE_SAME_SITE', 'lax').toLowerCase(),
     sessionTtlSeconds: integer('SESSION_TTL_SECONDS', 604800, { min: 300, max: 2592000 }),
+    adminMfaRequired: boolean('ADMIN_MFA_REQUIRED', true),
     sessionHmacKey: required('SESSION_HMAC_KEY'),
     piiHashKey: required('PII_HASH_KEY'),
     mfaEncryptionKeyBase64: required('MFA_ENCRYPTION_KEY_BASE64'),
@@ -186,6 +195,10 @@ export function loadConfig() {
     if (config.emailProvider === 'log') throw new Error('EMAIL_PROVIDER=log is forbidden for staging/production');
     if (!config.supportFromEmail) throw new Error('SUPPORT_FROM_EMAIL is required for staging/production');
     if (publicAppOrigins.some((origin) => !origin.startsWith('https://'))) throw new Error('Staging/production public origins must use HTTPS');
+  }
+
+  if (isProduction && !config.adminMfaRequired) {
+    throw new Error('ADMIN_MFA_REQUIRED=false is forbidden in production');
   }
 
   if (config.otpProvider === 'webhook' && !config.smsWebhookUrl) throw new Error('SMS_WEBHOOK_URL is required when OTP_PROVIDER=webhook');

@@ -260,10 +260,16 @@ loginForm.addEventListener('submit', async (event) => {
   try {
     const values = Object.fromEntries(new FormData(loginForm));
     const result = await request('/v1/auth/admin/login', { method: 'POST', body: JSON.stringify(values) });
-    state.challengeToken = result.challengeToken;
-    loginForm.hidden = true;
-    el('#mfa-form').hidden = false;
-    el('#mfa-form input').focus();
+    if (result.mfaRequired) {
+      state.challengeToken = result.challengeToken;
+      loginForm.hidden = true;
+      el('#mfa-form').hidden = false;
+      el('#mfa-form input').focus();
+    } else {
+      state.csrfToken = result.csrfToken;
+      sessionStorage.setItem('thiqah:admin-csrf', state.csrfToken);
+      await loadDashboard();
+    }
   } catch (error) {
     showAlert(el('#login-message'), error.code === 'RATE_LIMITED' ? 'محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.' : 'بيانات الدخول غير صحيحة أو خدمة الإدارة غير متاحة الآن.');
   } finally { busy(loginForm, false); }
