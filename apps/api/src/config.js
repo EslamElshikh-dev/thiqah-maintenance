@@ -39,6 +39,13 @@ function validateUpstashRestUrl(value) {
   }
 }
 
+function validateR2WorkerUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !['/', ''].includes(url.pathname)) {
+    throw new Error('R2_WORKER_URL must be an HTTPS service origin without credentials, query, hash, or path');
+  }
+}
+
 export function loadDatabaseConfig() {
   const nodeEnv = optional('NODE_ENV', 'development');
   const appEnv = optional('APP_ENV', nodeEnv === 'production' ? 'production' : 'development');
@@ -79,7 +86,7 @@ export function loadConfig() {
   const storageProvider = optional('STORAGE_PROVIDER', 'gcs').toLowerCase();
   const redisMode = optional('REDIS_MODE', 'tcp').toLowerCase();
   if (!['url', 'cloudsql-iam'].includes(databaseMode)) throw new Error('DATABASE_MODE must be url or cloudsql-iam');
-  if (!['gcs', 'r2'].includes(storageProvider)) throw new Error('STORAGE_PROVIDER must be gcs or r2');
+  if (!['gcs', 'r2', 'r2-worker'].includes(storageProvider)) throw new Error('STORAGE_PROVIDER must be gcs, r2, or r2-worker');
   if (!['tcp', 'rest'].includes(redisMode)) throw new Error('REDIS_MODE must be tcp or rest');
 
   const config = {
@@ -118,6 +125,8 @@ export function loadConfig() {
     r2Bucket: optional('R2_BUCKET'),
     r2AccessKeyId: optional('R2_ACCESS_KEY_ID'),
     r2SecretAccessKey: optional('R2_SECRET_ACCESS_KEY'),
+    r2WorkerUrl: optional('R2_WORKER_URL').replace(/\/$/, ''),
+    r2WorkerHmacKey: optional('R2_WORKER_HMAC_KEY'),
 
     otpProvider: optional('OTP_PROVIDER', 'log').toLowerCase(),
     smsSenderId: optional('SMS_SENDER_ID', 'THIQAH'),
@@ -154,8 +163,14 @@ export function loadConfig() {
   if (config.storageProvider === 'gcs') {
     if (!config.gcsBucket) throw new Error('GCS_BUCKET is required when STORAGE_PROVIDER=gcs');
     if (!config.gcpProjectId) throw new Error('GCP_PROJECT_ID is required when STORAGE_PROVIDER=gcs');
-  } else if (!config.r2AccountId || !config.r2Bucket || !config.r2AccessKeyId || !config.r2SecretAccessKey) {
-    throw new Error('R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required when STORAGE_PROVIDER=r2');
+  } else if (config.storageProvider === 'r2') {
+    if (!config.r2AccountId || !config.r2Bucket || !config.r2AccessKeyId || !config.r2SecretAccessKey) {
+      throw new Error('R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required when STORAGE_PROVIDER=r2');
+    }
+  } else {
+    if (!config.r2WorkerUrl || !config.r2WorkerHmacKey) throw new Error('R2_WORKER_URL and R2_WORKER_HMAC_KEY are required when STORAGE_PROVIDER=r2-worker');
+    validateR2WorkerUrl(config.r2WorkerUrl);
+    if (config.r2WorkerHmacKey.length < 32) throw new Error('R2_WORKER_HMAC_KEY must be at least 32 characters');
   }
 
   if (config.sessionHmacKey.length < 32 || config.piiHashKey.length < 32) throw new Error('SESSION_HMAC_KEY and PII_HASH_KEY must each be at least 32 characters');
