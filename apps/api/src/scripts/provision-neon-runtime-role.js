@@ -46,7 +46,7 @@ try {
     END
     $$;
   `);
-  await client.query(`ALTER ROLE ${RUNTIME_ROLE} INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '${verifier}'`);
+  await client.query(`ALTER ROLE ${RUNTIME_ROLE} INHERIT PASSWORD '${verifier}'`);
   await client.query(`GRANT thiqah_app TO ${RUNTIME_ROLE}`);
   await client.query('COMMIT');
 } catch (error) {
