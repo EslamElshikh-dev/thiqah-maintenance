@@ -21,6 +21,13 @@ function validateAdminUrl(value) {
   return url;
 }
 
+function runtimeUrlFromAdmin(adminUrl, password) {
+  const url = new URL(adminUrl.toString());
+  url.username = RUNTIME_ROLE;
+  url.password = password;
+  return url;
+}
+
 const adminUrl = validateAdminUrl(required('NEON_DATABASE_URL_ADMIN'));
 const runtimePassword = required('NEON_RUNTIME_DB_PASSWORD');
 const verifier = createPostgresScramVerifier(runtimePassword);
@@ -39,16 +46,47 @@ try {
     END
     $$;
   `);
-  await client.query(`ALTER ROLE ${RUNTIME_ROLE} INHERIT PASSWORD '${verifier}'`);
+  await client.query(`ALTER ROLE ${RUNTIME_ROLE} INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '${verifier}'`);
   await client.query(`GRANT thiqah_app TO ${RUNTIME_ROLE}`);
   await client.query('COMMIT');
-
-  console.log('Neon runtime role provisioned with inherited thiqah_app privileges.');
-  console.log(`RUNTIME_DATABASE_HOST=${adminUrl.hostname}`);
-  console.log(`RUNTIME_DATABASE_USER=${RUNTIME_ROLE}`);
 } catch (error) {
   await client.query('ROLLBACK');
   throw error;
 } finally {
   await client.end();
+}
+
+const runtime = new Client({
+  connectionString: runtimeUrlFromAdmin(adminUrl, runtimePassword).toString(),
+  application_name: 'thiqah-neon-runtime-verifier'
+});
+await runtime.connect();
+try {
+  const role = (await runtime.query(`
+    SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolinherit
+    FROM pg_roles
+    WHERE rolname = current_user
+  `)).rows[0];
+  if (!role || role.rolname !== RUNTIME_ROLE) throw new Error('Runtime role identity verification failed');
+  if (role.rolsuper || role.rolcreatedb || role.rolcreaterole || !role.rolinherit) {
+    throw new Error('Runtime role has unsafe PostgreSQL role attributes');
+  }
+
+  const privileges = (await runtime.query(`
+    SELECT
+      has_schema_privilege(current_user, 'thiqah', 'USAGE') AS schema_usage,
+      has_schema_privilege(current_user, 'thiqah', 'CREATE') AS schema_create,
+      has_table_privilege(current_user, 'thiqah.services', 'SELECT') AS services_select,
+      has_table_privilege(current_user, 'thiqah.orders', 'INSERT,UPDATE,SELECT') AS orders_rw
+  `)).rows[0];
+
+  if (!privileges.schema_usage || privileges.schema_create || !privileges.services_select || !privileges.orders_rw) {
+    throw new Error('Runtime role privilege verification failed');
+  }
+
+  console.log('Neon runtime role verified: least-privilege boundary passed.');
+  console.log(`RUNTIME_DATABASE_HOST=${adminUrl.hostname}`);
+  console.log(`RUNTIME_DATABASE_USER=${RUNTIME_ROLE}`);
+} finally {
+  await runtime.end();
 }
