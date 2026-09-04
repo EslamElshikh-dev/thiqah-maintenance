@@ -83,11 +83,14 @@ export async function buildApp(ctx) {
       ? { maxAge: 63_072_000, includeSubDomains: true, preload: ctx.config.isProduction }
       : false
   });
+  const rateLimitPersistence = ctx.redis?.kind === 'upstash-rest'
+    ? { store: ctx.redis.rateLimitStore }
+    : { redis: ctx.redis || undefined };
   await app.register(rateLimit, {
     global: true,
     max: 120,
     timeWindow: '1 minute',
-    redis: ctx.redis || undefined,
+    ...rateLimitPersistence,
     keyGenerator: (request) => request.ip,
     errorResponseBuilder: () => ({ ok: false, error: 'RATE_LIMITED', message: 'Too many requests' })
   });
