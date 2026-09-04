@@ -32,7 +32,7 @@ jobs:
       - name: Install from committed lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Provision and encrypt raw handoff
+      - name: Provision, validate with application adapter, and encrypt handoff
         shell: bash
         run: |
           set -euo pipefail
@@ -43,6 +43,62 @@ jobs:
             -X POST https://upstash.com/start-redis \
             -H 'User-Agent: openai-codex' \
             > "$RESPONSE_FILE"
+
+          ENDPOINT="$(sed -n 's/^Endpoint:[[:space:]]*//p' "$RESPONSE_FILE" | head -n1)"
+          TOKEN="$(sed -n 's/^Token:[[:space:]]*//p' "$RESPONSE_FILE" | head -n1)"
+          case "$ENDPOINT" in
+            https://*.upstash.io) ;;
+            *) echo 'Upstash returned an invalid REST endpoint' >&2; exit 1 ;;
+          esac
+          if [ "${#TOKEN}" -lt 20 ]; then
+            echo 'Upstash returned an invalid REST token' >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$ENDPOINT"
+          echo "::add-mask::$TOKEN"
+          export UPSTASH_REDIS_REST_URL="$ENDPOINT"
+          export UPSTASH_REDIS_REST_TOKEN="$TOKEN"
+
+          node --input-type=module <<'NODE'
+          import { createUpstashRestRedis } from './apps/api/src/plugins/upstash-rest-rate-limit.js';
+
+          const config = {
+            upstashRedisRestUrl: process.env.UPSTASH_REDIS_REST_URL,
+            upstashRedisRestToken: process.env.UPSTASH_REDIS_REST_TOKEN
+          };
+          const redis = createUpstashRestRedis(config);
+          if (await redis.ping() !== 'PONG') throw new Error('Upstash PING verification failed');
+
+          const Store = redis.rateLimitStore;
+          const store = new Store({ max: 3, continueExceeding: false, exponentialBackoff: false });
+          const key = `gha-${Date.now()}`;
+          const invoke = (method) => new Promise((resolve, reject) => {
+            store[method](key, (error, value) => error ? reject(error) : resolve(value), 60_000, 3);
+          });
+
+          const first = await invoke('incr');
+          const snapshot = await invoke('read');
+          const second = await invoke('incr');
+          if (first.current !== 1 || snapshot.current !== 1 || second.current !== 2) {
+            throw new Error('Upstash rate-limit counter verification failed');
+          }
+          if (first.ttl <= 0 || snapshot.ttl <= 0 || second.ttl <= 0) {
+            throw new Error('Upstash rate-limit TTL verification failed');
+          }
+
+          const cleanup = await fetch(config.upstashRedisRestUrl, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${config.upstashRedisRestToken}`,
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify(['DEL', `thiqah:ratelimit:${key}`]),
+            signal: AbortSignal.timeout(5_000)
+          });
+          if (!cleanup.ok) throw new Error('Upstash cleanup failed');
+          console.log('Upstash REST live validation passed: PING + atomic counter + TTL + read + cleanup.');
+          NODE
 
           cp "$RESPONSE_FILE" /tmp/thiqah-upstash-handoff.txt
           cat > /tmp/thiqah-upstash-public.pem <<'PUBKEY'
@@ -72,7 +128,6 @@ jobs:
             -out /tmp/thiqah-upstash-aes.key.enc
 
           sha256sum /tmp/thiqah-upstash-handoff.enc /tmp/thiqah-upstash-aes.key.enc > /tmp/SHA256SUMS
-          echo "Upstash raw handoff captured and encrypted; bytes=$(wc -c < "$RESPONSE_FILE")"
           rm -f "$RESPONSE_FILE" /tmp/thiqah-upstash-handoff.txt /tmp/thiqah-upstash-aes.key /tmp/thiqah-upstash-public.pem
 
       - name: Upload encrypted Upstash handoff
