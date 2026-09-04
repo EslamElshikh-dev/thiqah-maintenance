@@ -1,11 +1,13 @@
 name: Bootstrap Cloudflare R2 Broker (one-shot)
 
-# One-shot bootstrap. Delete after the broker is deployed and verified.
+# One-shot bootstrap. Run manually and delete after the broker is verified.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/bootstrap-r2-device.yml
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type BOOTSTRAP_R2 to start the one-shot deployment'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -21,6 +23,7 @@ jobs:
       WORKER_NAME: thiqah-staging-r2-broker
       PREFERRED_WORKERS_SUBDOMAIN: thiqah-eslam-79f5d5c0
       WRANGLER_SEND_METRICS: "false"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       PUBLIC_KEY_B64: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQ0lqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FnOEFNSUlDQ2dLQ0FnRUFwdk90b2RFT2h6a2w5Ukc1QjNIUwpJU3I0WjdQZUc3aDZkTXFkNnNlS2EzUU90bkFXUWVHaWFEVXFnRnVZUlpuc3REZzBuais5V1VyV2Z3b0VqSkdxClFPbXN6clJRRUo3QnF2V21kV3hoUnNlY3liTlVocjkwdzZiMTJYUjhjbjBRR285K3lZUWhqRUtJTzhtRFFNNzkKMkVTWVBrbjlTWkVUaG9uZ3loRVVPTEloUTNBYzVHTzJON2I0TjRPYS8zQnBOc2R2ZGdIUGVEV2JWOFFpVi9XMApJZ0haQTVzNWhldGphS1NaMEJjYXZQbC9sYUM2ZUFzTXlRbmZNYi83MkJiRk44SWdnSGRVWThsQjVnL1RkbDN6CkZRUHp6R3hnaXFIamJYUkRKMGpWOHg3MWh5dHhyaGlPeEtBQ1hMUnIvRDNXNjlMYVhpRkFHU1Iwa1o2c1ZKTmoKa1IxdzNHcSt3eGk0NTBVZ2N3dm90aGtiU3h0bGFZbWNqOTEyb2E4ODFmaWIwOGM2WDVmQzgvOGptZURUYkNJVQpxWERHM2VoellDQXZpdlk0cjUxQkI2bnhkWktyeGU4c1JnTU01NXJic3YwYmVTUDJhbGNiNFhYVHdPRXAzLzNzCmVLYTh2RTRuaWY1Q202RUl2VGJMdkxnNllDdHBLb2VZdTNuQlhSMzdVaVQ5K3NudGs5L0ZUMGVQSWtGK3ppa2sKYkY0L0cyUVBnQmRrWE40TUptekNxRUw3TWs5ckJGS3JtTzdxL0hQOHJSWnlZTzNpQ0YwYURiam9wYUFYN1hLcApTeHBBY05PUlpEaHhabUNWbXZwWDkyYUpocjg2ZDFGenNMYmlUZ1g5NmZZUHdMMk51Tk5hYmFzWDNJdmxzQ3FaCmI3TzhtK3VLVyt0bEo1N3VaZGRQOUs4Q0F3RUFBUT09Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=
 
     steps:
@@ -39,6 +42,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "${{ inputs.confirm }}" != "BOOTSTRAP_R2" ]]; then
+            echo "Confirmation input did not match BOOTSTRAP_R2. Aborting safely."
+            exit 20
+          fi
+
           echo "$PUBLIC_KEY_B64" | base64 -d > public.pem
 
           seal() {
@@ -46,13 +54,18 @@ jobs:
               -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 | base64 -w0
           }
 
-          echo "Starting Cloudflare device authorization."
-          echo "Verification page: https://dash.cloudflare.com/oauth2/device"
-          wrangler login --device --browser=false
-
-          AUTH_JSON="$(wrangler auth token --json)"
-          CF_TOKEN="$(printf '%s' "$AUTH_JSON" | jq -r '.token')"
-          test -n "$CF_TOKEN" && test "$CF_TOKEN" != "null"
+          if [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+            echo "Using the repository-scoped Cloudflare API token."
+            CF_TOKEN="$CLOUDFLARE_API_TOKEN"
+          else
+            echo "No CLOUDFLARE_API_TOKEN secret is configured."
+            echo "Starting the time-limited Cloudflare device authorization flow."
+            echo "Verification page: https://dash.cloudflare.com/oauth2/device"
+            wrangler login --device --browser=false
+            AUTH_JSON="$(wrangler auth token --json)"
+            CF_TOKEN="$(printf '%s' "$AUTH_JSON" | jq -r '.token')"
+            test -n "$CF_TOKEN" && test "$CF_TOKEN" != "null"
+          fi
 
           curl -fsS https://api.cloudflare.com/client/v4/user \
             -H "Authorization: Bearer $CF_TOKEN" > user.json
