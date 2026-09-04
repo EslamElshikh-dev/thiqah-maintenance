@@ -1,0 +1,137 @@
+name: Provision Claimable Neon Staging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/provision-claimable-neon.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thiqah-claimable-neon-staging
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.repository == 'EslamElshikh-dev/thiqah-maintenance'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout reviewed staging branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: feat/phase2-connected-staging
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install from committed lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Provision, migrate, and encrypt handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          RESPONSE_FILE="$(mktemp)"
+          curl --fail --silent --show-error \
+            -X POST https://neon.new/api/v1/database \
+            -H 'Content-Type: application/json' \
+            -d '{"ref":"thiqah-staging-20260904"}' \
+            > "$RESPONSE_FILE"
+
+          ADMIN_URL="$(jq -er '.connection_string' "$RESPONSE_FILE")"
+          CLAIM_URL="$(jq -er '.claim_url' "$RESPONSE_FILE")"
+          PROJECT_ID="$(jq -er '.neon_project_id' "$RESPONSE_FILE")"
+          EXPIRES_AT="$(jq -er '.expires_at' "$RESPONSE_FILE")"
+          RUNTIME_PASSWORD="$(openssl rand -hex 32)"
+
+          case "$ADMIN_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo 'Neon returned an invalid PostgreSQL URL' >&2; exit 1 ;;
+          esac
+
+          echo "::add-mask::$ADMIN_URL"
+          echo "::add-mask::$CLAIM_URL"
+          echo "::add-mask::$RUNTIME_PASSWORD"
+
+          export NODE_ENV=production
+          export APP_ENV=staging
+          export DATABASE_MODE=url
+          export DATABASE_URL="$ADMIN_URL"
+          export DB_POOL_MAX=1
+
+          npm run migrate
+
+          export NEON_DATABASE_URL_ADMIN="$ADMIN_URL"
+          export NEON_RUNTIME_DB_PASSWORD="$RUNTIME_PASSWORD"
+          npm run provision:neon-runtime
+          node scripts/check-free-staging-db.mjs
+
+          RUNTIME_URL="$(node --input-type=module <<'NODE'
+          const url = new URL(process.env.DATABASE_URL);
+          url.username = 'thiqah_runtime';
+          url.password = process.env.NEON_RUNTIME_DB_PASSWORD;
+          process.stdout.write(url.toString());
+          NODE
+          )"
+          echo "::add-mask::$RUNTIME_URL"
+
+          jq -n \
+            --arg neon_project_id "$PROJECT_ID" \
+            --arg expires_at "$EXPIRES_AT" \
+            --arg claim_url "$CLAIM_URL" \
+            --arg admin_database_url "$ADMIN_URL" \
+            --arg runtime_database_url "$RUNTIME_URL" \
+            '{
+              neon_project_id: $neon_project_id,
+              expires_at: $expires_at,
+              claim_url: $claim_url,
+              admin_database_url: $admin_database_url,
+              runtime_database_url: $runtime_database_url
+            }' > /tmp/thiqah-neon-handoff.json
+
+          cat > /tmp/thiqah-neon-public.pem <<'PUBKEY'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEArhtMCLKmfjo0b7yJirlP
+          EhXj4jcrfTLSsPE0vtFXu5GMk1u/OA198UmJBMfWTvu5LIWN+1OSeLH/Y5+nqVI9
+          JHuQssUO76EexFK2U5hVzKeKhFZAC8RJRZFxT72Y5NEYoeLSxP3c//QlHqpYpVWQ
+          7qluCOq71UFsW4vcBuxtsYuAqQ4gPbIoYFRn64lW017yT7bhPWyY/1T8IsmjbHcw
+          y+ejH9SoOY2FPN/wMj0LjNrZ0sUKR2Q+rmW5UxnnkX3/XKZjOHnNDWdbllxAQYHz
+          7jJiKSXEPu1ZEYNIoH5RbXlCEMINyHEGIvB4e5cQLFal075RDb/E6SobMbDTwFGp
+          DDJecDLonqFK4JmmenLl9mV/rtCGpnVY5w+Qa/+jOIBxo2WukiSqDkE7Ktct1kio
+          rz+ktNvOwWCdRYu2qJn1K8GceskZBazfRO07lvp4uwmKjNdObXq1fzgi0cI/kfzj
+          uNPCiBLQkKY8nUQjMfxV4Se21kTT+yIoLd3bpQE2zW4NAgMBAAE=
+          -----END PUBLIC KEY-----
+          PUBKEY
+
+          openssl rand 32 > /tmp/thiqah-neon-aes.key
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in /tmp/thiqah-neon-handoff.json \
+            -out /tmp/thiqah-neon-handoff.enc \
+            -pass file:/tmp/thiqah-neon-aes.key
+          openssl pkeyutl -encrypt \
+            -pubin -inkey /tmp/thiqah-neon-public.pem \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -in /tmp/thiqah-neon-aes.key \
+            -out /tmp/thiqah-neon-aes.key.enc
+
+          sha256sum /tmp/thiqah-neon-handoff.enc /tmp/thiqah-neon-aes.key.enc > /tmp/SHA256SUMS
+          rm -f "$RESPONSE_FILE" /tmp/thiqah-neon-handoff.json /tmp/thiqah-neon-aes.key /tmp/thiqah-neon-public.pem
+
+      - name: Upload encrypted Neon handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: thiqah-neon-claimable-handoff
+          path: |
+            /tmp/thiqah-neon-handoff.enc
+            /tmp/thiqah-neon-aes.key.enc
+            /tmp/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
