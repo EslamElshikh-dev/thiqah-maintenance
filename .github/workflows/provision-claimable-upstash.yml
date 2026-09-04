@@ -1,0 +1,117 @@
+name: Provision Claimable Upstash Staging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/provision-claimable-upstash.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thiqah-claimable-upstash-staging
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.repository == 'EslamElshikh-dev/thiqah-maintenance'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout reviewed staging branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: feat/phase2-connected-staging
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install from committed lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Provision, verify, and encrypt handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          RESPONSE_FILE="$(mktemp)"
+          curl --fail --silent --show-error \
+            -X POST https://upstash.com/start-redis \
+            -H 'User-Agent: openai-codex' \
+            > "$RESPONSE_FILE"
+
+          REDIS_URL="$(grep -Eo 'rediss://[^[:space:]`"<>]+' "$RESPONSE_FILE" | head -n1)"
+          if [ -z "$REDIS_URL" ]; then
+            echo 'Upstash response did not contain a TLS Redis URL' >&2
+            exit 1
+          fi
+          echo "::add-mask::$REDIS_URL"
+
+          export THIQAH_UPSTASH_REDIS_URL="$REDIS_URL"
+          node --input-type=module <<'NODE'
+          import Redis from 'ioredis';
+          const url = process.env.THIQAH_UPSTASH_REDIS_URL;
+          const redis = new Redis(url, {
+            lazyConnect: true,
+            enableReadyCheck: true,
+            connectTimeout: 10000,
+            maxRetriesPerRequest: 1,
+            tls: {}
+          });
+          const key = `thiqah:staging:probe:${Date.now()}`;
+          try {
+            await redis.connect();
+            await redis.set(key, 'ok', 'EX', 60);
+            const value = await redis.get(key);
+            if (value !== 'ok') throw new Error('Upstash SET/GET verification failed');
+            await redis.del(key);
+            console.log('Upstash TLS Redis verification passed.');
+          } finally {
+            redis.disconnect();
+          }
+          NODE
+
+          cp "$RESPONSE_FILE" /tmp/thiqah-upstash-handoff.txt
+          cat > /tmp/thiqah-upstash-public.pem <<'PUBKEY'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAw8jsg70Ve9zpY6uQkmPp
+          Ymv5CI2kzjoqnWz8YuTBXnn1mwsl21u2e3QbaofORUhdLD01Zg+83scLCM4mmoef
+          YsSjKRhESuSb1+GMhavHO6sYznHwnRkP9DSyxnCFRJeHTKIw22qjdazArGq1/azB
+          7xR8UXhW6T0uxF1HFO/nioX5cvzizs95leEwORFp17kMyU9EWveD9mMrzcoGmMzp
+          BFnWRGu3CGEAUqjKgLkOe8hmpRY2eZz2UnBo3vvpo44Mzqi2UzJKMMZhDHJb0DXL
+          uHqjY2ZeZWxCQZfWbWKwFtifr2tlMgS8K++L5v8Avg0PRywFtdSPUJ1IAqPkK2Mq
+          4pzI1kid5lYKU4eq/gCnfb6JDiOpg+tfqX72XMsJG8QGJFQoo1T2rVWlv5qkUCI1
+          11fVtCtzcE+FQOb8sIZs/hizASRZ9IwBfZQGPba4rLyN7WHsVyFLLzd1tktZpldT
+          mnbtRQzimC3m8mTYNppNwTQW6rwbYP3wHZzVaZgxUg4lAgMBAAE=
+          -----END PUBLIC KEY-----
+          PUBKEY
+
+          openssl rand 32 > /tmp/thiqah-upstash-aes.key
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in /tmp/thiqah-upstash-handoff.txt \
+            -out /tmp/thiqah-upstash-handoff.enc \
+            -pass file:/tmp/thiqah-upstash-aes.key
+          openssl pkeyutl -encrypt \
+            -pubin -inkey /tmp/thiqah-upstash-public.pem \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -in /tmp/thiqah-upstash-aes.key \
+            -out /tmp/thiqah-upstash-aes.key.enc
+
+          sha256sum /tmp/thiqah-upstash-handoff.enc /tmp/thiqah-upstash-aes.key.enc > /tmp/SHA256SUMS
+          rm -f "$RESPONSE_FILE" /tmp/thiqah-upstash-handoff.txt /tmp/thiqah-upstash-aes.key /tmp/thiqah-upstash-public.pem
+
+      - name: Upload encrypted Upstash handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: thiqah-upstash-claimable-handoff
+          path: |
+            /tmp/thiqah-upstash-handoff.enc
+            /tmp/thiqah-upstash-aes.key.enc
+            /tmp/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
