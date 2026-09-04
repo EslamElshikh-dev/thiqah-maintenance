@@ -1,17 +1,30 @@
 # Known blockers outside the source repository
 
-Resolved in GitHub:
+## Resolved in GitHub
 
 - Repository creation and source publication are complete.
-- `package-lock.json` is committed and verified with Node.js 24.
-- `npm ci`, application checks, and the production Docker image build pass in GitHub Actions.
+- The committed lockfile includes the pinned R2/S3 dependencies.
+- Node.js 24 install/check and Docker build are CI-gated.
+- PostgreSQL URL mode works with Neon.
+- TLS Redis URL mode works with Upstash through the existing `ioredis` client.
+- Cloudflare R2 private media support is implemented with short-lived signed upload/read URLs, overwrite protection, and server-side size, magic-byte and SHA-256 validation.
+- Native Unifonic OTP/SMS and Resend password-reset adapters are implemented and tested.
+- A Render Free Blueprint and protected Neon migration workflow are committed.
 
-Remaining external gates:
+## Remaining external gates
 
-1. **GCP Dammam account access**: a KSA-billed account must use the Google Cloud/CNTXT path before Terraform can provision `me-central2` resources.
-2. **No connected GCP control-plane tool is available in this chat**: Cloud Run, Cloud SQL, Redis, Storage, regional Secret Manager, WIF, and IAM cannot be created from this session until a compatible GCP connection exists.
-3. **SMS provider activation**: the native Unifonic adapter is implemented and tested, but staging still needs a real Unifonic account, AppSid, and registered Sender ID before it can be selected.
-4. **Transactional email activation**: the native Resend adapter is implemented and tested, but staging still needs a verified sender domain/address and sending API key before it can be selected.
-5. **Legacy source gap**: the original Vercel server source remains unavailable. Thiqah v1 is a clean rebuild based on the recovered product/API contract, not a claim that hidden legacy source was recovered.
+1. Create a dedicated Neon database for Thiqah staging, then configure the protected migration connection and the Render runtime connection.
+2. Create a dedicated Upstash TLS Redis database and configure its runtime URL in Render.
+3. Create a private R2 bucket, restrict its application token to that bucket, and configure browser CORS for the approved staging frontend origin(s).
+4. Create the Render service from `render.yaml` and complete its protected runtime configuration.
+5. Activate Unifonic with an approved Sender ID for a real OTP test.
+6. Verify the Resend sender and complete a real password-reset delivery test.
+7. Run migrations, deploy staging, pass health checks, bootstrap the owner once with MFA, then complete the security acceptance checklist.
 
-The legacy Vercel production deployment remains untouched. Do not merge the staging foundation into a production release until the connected staging gates pass.
+## Not blockers for free staging
+
+- GCP/CNTXT/Dammam is no longer required for the selected staging path.
+- Existing Supabase projects are not used or modified.
+- The GCP Terraform/WIF implementation remains only as an optional future production path.
+
+The legacy Vercel production deployment remains untouched. The Free Stack is for staging and limited pilot validation, not a production-readiness claim.
