@@ -1,0 +1,1 @@
+Provider credentials remain in Regional Secret Manager. The public repository contains only provider names, endpoint constants, and non-secret configuration. No AppSid, API key, customer data, or production secret is committed.
