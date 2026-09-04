@@ -28,7 +28,7 @@ jobs:
           node-version: '24'
 
       - name: Install Wrangler
-        run: npm install --global wrangler@4.119.0
+        run: npm install --global wrangler@4.129.0
 
       - name: Authorize Cloudflare and provision R2
         shell: bash
@@ -36,8 +36,9 @@ jobs:
           set -euo pipefail
           echo "$PUBLIC_KEY_B64" | base64 -d > public.pem
 
-          echo "Starting Cloudflare device authorization."
-          wrangler login --device --browser=false --no-use-keyring
+          echo "Starting Cloudflare device authorization with current Wrangler."
+          echo "Verification page: https://dash.cloudflare.com/oauth2/device"
+          wrangler login --device --browser=false
 
           AUTH_JSON="$(wrangler auth token --json)"
           CF_TOKEN="$(printf '%s' "$AUTH_JSON" | jq -r '.token')"
