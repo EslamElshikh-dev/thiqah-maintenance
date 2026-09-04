@@ -4,6 +4,7 @@ import { createDb } from './plugins/db.js';
 import { createRedis } from './plugins/redis.js';
 import { createStorageService } from './services/storage.js';
 import { createR2StorageService } from './services/storage-r2.js';
+import { createR2WorkerStorageService } from './services/storage-r2-worker.js';
 import { createSmsProvider } from './services/sms.js';
 import { createEmailProvider } from './services/email.js';
 import { createUnavailableService } from './services/unavailable.js';
@@ -24,29 +25,40 @@ if (coreStagingMode && config.appEnv !== 'staging') {
 }
 
 const SENTINEL = 'not-configured';
-const hasCoreSentinel = [
-  config.r2AccountId,
-  config.r2Bucket,
-  config.r2AccessKeyId,
-  config.r2SecretAccessKey,
-  config.unifonicAppSid,
-  config.resendApiKey
-].some((value) => value === SENTINEL);
-if (deployed && !coreStagingMode && hasCoreSentinel) {
-  throw new Error('Core-staging sentinel credentials are forbidden outside CORE_STAGING_MODE');
+const configured = (value) => Boolean(value && value !== SENTINEL);
+const storageConfigured = config.storageProvider === 'gcs'
+  ? configured(config.gcsBucket) && configured(config.gcpProjectId)
+  : config.storageProvider === 'r2-worker'
+    ? configured(config.r2WorkerUrl) && configured(config.r2WorkerHmacKey)
+    : configured(config.r2AccountId) && configured(config.r2Bucket) && configured(config.r2AccessKeyId) && configured(config.r2SecretAccessKey);
+const smsConfigured = config.otpProvider === 'webhook'
+  ? configured(config.smsWebhookUrl)
+  : config.otpProvider === 'unifonic'
+    ? configured(config.unifonicAppSid)
+    : false;
+const emailConfigured = config.emailProvider === 'webhook'
+  ? configured(config.emailWebhookUrl)
+  : config.emailProvider === 'resend'
+    ? configured(config.resendApiKey)
+    : false;
+
+if (deployed && !coreStagingMode && (!storageConfigured || !smsConfigured || !emailConfigured)) {
+  throw new Error('All external dependencies must be configured outside CORE_STAGING_MODE');
 }
 
 const db = await createDb(config);
 const redis = createRedis(config);
 if (redis && redis.status === 'wait') await redis.connect();
 
-const storage = coreStagingMode
-  ? createUnavailableService('storage')
-  : config.storageProvider === 'r2'
-    ? createR2StorageService(config)
-    : createStorageService(config);
-const sms = coreStagingMode ? createUnavailableService('sms') : createSmsProvider(config);
-const email = coreStagingMode ? createUnavailableService('email') : createEmailProvider(config);
+function createConfiguredStorage() {
+  if (config.storageProvider === 'r2-worker') return createR2WorkerStorageService(config);
+  if (config.storageProvider === 'r2') return createR2StorageService(config);
+  return createStorageService(config);
+}
+
+const storage = coreStagingMode && !storageConfigured ? createUnavailableService('storage') : createConfiguredStorage();
+const sms = coreStagingMode && !smsConfigured ? createUnavailableService('sms') : createSmsProvider(config);
+const email = coreStagingMode && !emailConfigured ? createUnavailableService('email') : createEmailProvider(config);
 const app = await buildApp({ config, db, redis, storage, sms, email, coreStagingMode });
 
 let shuttingDown = false;
