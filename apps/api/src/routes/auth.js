@@ -56,7 +56,7 @@ export async function authRoutes(app, ctx) {
     let selected;
     if(session.actor_type==='customer') selected=await db.query(`SELECT id FROM thiqah.customers WHERE id=$1`,[session.actor_id]);
     else if(session.actor_type==='technician') selected=await db.query(`SELECT id FROM thiqah.technicians WHERE id=$1`,[session.actor_id]);
-    else selected=await db.query(`SELECT id FROM thiqah.admins WHERE id=$1`,[session.actor_id]);
-    return {ok:true,actorType:session.actor_type,actorId:selected.rows[0]?.id||null};
+    else selected=await db.query(`SELECT id,username,display_name,role,permissions FROM thiqah.admins WHERE id=$1`,[session.actor_id]);
+    return {ok:true,actorType:session.actor_type,actorId:selected.rows[0]?.id||null,actor:session.actor_type==='admin'?selected.rows[0]:undefined};
   });
 }
