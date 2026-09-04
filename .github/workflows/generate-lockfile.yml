@@ -1,0 +1,50 @@
+name: Generate reviewed lockfile once
+
+on:
+  push:
+    branches: [feat/phase2-connected-staging]
+    paths-ignore:
+      - package-lock.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: thiqah-lockfile-once
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: ${{ !contains(github.event.head_commit.message, '[lockfile-generated]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: feat/phase2-connected-staging
+          fetch-depth: 0
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Generate lockfile without lifecycle scripts
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify clean install and tests from lockfile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+
+      - name: Commit lockfile and remove one-time workflow
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/generate-lockfile.yml
+          git add package-lock.json .github/workflows/generate-lockfile.yml
+          git commit -m "chore: add verified npm lockfile [lockfile-generated]"
+          git push origin HEAD:feat/phase2-connected-staging
