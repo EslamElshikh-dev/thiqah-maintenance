@@ -34,20 +34,17 @@ try {
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${RUNTIME_ROLE}') THEN
-        CREATE ROLE ${RUNTIME_ROLE} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+        CREATE ROLE ${RUNTIME_ROLE} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
       END IF;
     END
     $$;
   `);
-  await client.query(`ALTER ROLE ${RUNTIME_ROLE} PASSWORD '${verifier}'`);
+  await client.query(`ALTER ROLE ${RUNTIME_ROLE} INHERIT PASSWORD '${verifier}'`);
   await client.query(`GRANT thiqah_app TO ${RUNTIME_ROLE}`);
   await client.query('COMMIT');
 
-  const runtimeUrl = new URL(adminUrl.toString());
-  runtimeUrl.username = RUNTIME_ROLE;
-  runtimeUrl.password = runtimePassword;
-  console.log('Neon runtime role provisioned with thiqah_app privileges.');
-  console.log(`RUNTIME_DATABASE_HOST=${runtimeUrl.hostname}`);
+  console.log('Neon runtime role provisioned with inherited thiqah_app privileges.');
+  console.log(`RUNTIME_DATABASE_HOST=${adminUrl.hostname}`);
   console.log(`RUNTIME_DATABASE_USER=${RUNTIME_ROLE}`);
 } catch (error) {
   await client.query('ROLLBACK');
