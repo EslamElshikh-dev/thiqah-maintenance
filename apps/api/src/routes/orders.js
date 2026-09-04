@@ -3,9 +3,11 @@ import { requireString, optionalString, assertUuid, optionalIsoDate, optionalIso
 import { createOrderTx, publicTrackOrder, transitionOrder, recoverTrackingToken } from '../services/orders.js';
 import { issueOtp, consumeOtpTx } from '../services/otp.js';
 import { requestContext } from '../lib/request-context.js';
-import { loadSession, requireActor, requireCsrf } from '../lib/session.js';
+import { requireActor, requireCsrf } from '../lib/session.js';
+import { requireAdminPermission } from '../lib/admin-access.js';
+import { requireTechnicianPermission } from '../lib/technician-access.js';
 import { beginIdempotency, completeIdempotency } from '../lib/idempotency.js';
-import { badRequest, forbidden, notFound } from '../lib/http.js';
+import { badRequest } from '../lib/http.js';
 
 function validateOrderInput(body, {guest=false}={}) {
   const latitude = body.latitude === null || body.latitude === undefined ? null : Number(body.latitude);
@@ -94,21 +96,36 @@ export async function orderRoutes(app, ctx) {
   });
 
   app.post('/v1/orders/:orderId/transition',async(request)=>{
-    const actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    let actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    if(actor.actor_type==='admin') {
+      const admin=await requireAdminPermission({db,config,request,permission:'orders.manage'});
+      actor={...actor,actor_id:admin.id};
+    }
+    if(actor.actor_type==='technician') actor=await requireTechnicianPermission({db,config,request,permission:'order_status.update'});
     requireCsrf(config,request);
     const result=await transitionOrder({db,actor,orderId:assertUuid(request.params.orderId,'orderId'),toStatus:request.body?.toStatus,reason:request.body?.reason,context:requestContext(config,request)});
     return {ok:true,order:{id:result.id,status:result.status}};
   });
 
   app.post('/v1/orders/:orderId/media/upload-intent',async(request)=>{
-    const actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    let actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    if(actor.actor_type==='admin') {
+      const admin=await requireAdminPermission({db,config,request,permission:'orders.manage'});
+      actor={...actor,actor_id:admin.id};
+    }
+    if(actor.actor_type==='technician') actor=await requireTechnicianPermission({db,config,request,permission:'work_media.upload'});
     requireCsrf(config,request);
     const result=await storage.createUploadIntent({db,actor,orderId:assertUuid(request.params.orderId,'orderId'),kind:request.body?.kind,mimeType:request.body?.mimeType,sizeBytes:Number(request.body?.sizeBytes)});
     return {ok:true,...result};
   });
 
   app.get('/v1/orders/:orderId/media/:mediaId/read-url',async(request)=>{
-    const actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    let actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    if(actor.actor_type==='admin') {
+      const admin=await requireAdminPermission({db,config,request,permission:'orders.read'});
+      actor={...actor,actor_id:admin.id};
+    }
+    if(actor.actor_type==='technician') actor=await requireTechnicianPermission({db,config,request,permission:'assigned_orders.read'});
     const result=await storage.createReadUrl({
       db,
       actor,
@@ -119,7 +136,12 @@ export async function orderRoutes(app, ctx) {
   });
 
   app.post('/v1/orders/:orderId/media/complete',async(request)=>{
-    const actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    let actor=await requireActor({db,config,request,actorTypes:['customer','technician','admin']});
+    if(actor.actor_type==='admin') {
+      const admin=await requireAdminPermission({db,config,request,permission:'orders.manage'});
+      actor={...actor,actor_id:admin.id};
+    }
+    if(actor.actor_type==='technician') actor=await requireTechnicianPermission({db,config,request,permission:'work_media.upload'});
     requireCsrf(config,request);
     const result=await storage.completeUpload({db,actor,intentId:assertUuid(request.body?.intentId,'intentId'),sha256Hex:String(request.body?.sha256Hex||'').toLowerCase()});
     return {ok:true,media:result};

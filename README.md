@@ -14,6 +14,7 @@ Security-first rebuild of **ثقة للصيانة المنزلية**. The legacy
 - Browser auth: opaque server-side sessions in HttpOnly cookies + CSRF token.
 - Mobile auth: opaque session token via Authorization header, intended for OS secure storage.
 - Admin MFA: TOTP is mandatory in staging/production.
+- Admin operations dashboard: live customer/order KPIs plus explicit employee and technician permission grants.
 - Audit and order-status history are append-only.
 - Database migrations: checksum-verified, advisory-locked, manually launched through a protected GitHub environment before schema-dependent Render deployment.
 - Render auto-deploy: only after GitHub checks pass.

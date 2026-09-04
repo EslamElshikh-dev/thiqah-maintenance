@@ -32,12 +32,17 @@ Base prefix: `/v1`.
 - `GET /orders/:id/media/:mediaId/read-url` → RBAC-checked, five-minute signed read URL; private bucket remains non-public.
 
 ## Administration
+- `GET /admin/dashboard` → live customer/order/technician KPIs, seven-day trend and recent activity.
 - `GET /admin/orders` → cursor pagination and optional status filter.
 - `POST /admin/orders/:id/assign` → assignment and status transition in one DB transaction.
 - `GET /admin/technicians`.
+- `GET /admin/access` → employee/technician accounts and permission catalog; owner permission required.
+- `POST|PATCH /admin/staff` → create or update employee access and revoke sessions on disable.
+- `POST|PATCH /admin/technicians` → create or update technician access and revoke sessions on disable.
 
 ## Technician
 - `GET /technician/orders` → active assignments only.
+- `POST /technician/orders/:id/notes` → permission-gated note on an active assignment only.
 
 ## Privacy
 - `DELETE /customer/me` → password step-up. Active jobs create a verified deletion request; otherwise PII is anonymized and media purge is queued.

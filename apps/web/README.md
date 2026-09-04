@@ -17,3 +17,8 @@ origin to `PUBLIC_APP_ORIGINS` on the API service.
 Set the Vercel project Root Directory to `apps/web`. No build command is
 required. Do not promote the staging UI until `/v1/settings`, OTP delivery,
 order creation, and opaque-token tracking pass end-to-end.
+
+The admin operations UI lives at `/admin`. It uses the real admin password +
+TOTP flow and never embeds credentials in browser assets. `/admin?demo=1`
+renders sanitized sample data for visual review only; mutations stay local to
+that preview session.

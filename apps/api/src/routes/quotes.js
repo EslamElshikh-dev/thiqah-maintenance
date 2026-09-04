@@ -1,12 +1,14 @@
 import { assertUuid, optionalIsoTimestamp } from '../../../../packages/core/src/validation.js';
 import { requireActor, requireCsrf } from '../lib/session.js';
+import { requireAdminPermission } from '../lib/admin-access.js';
 import { requestContext } from '../lib/request-context.js';
 import { createAndSendQuote, approveQuote } from '../services/quotes.js';
 
 export async function quoteRoutes(app,ctx){
   const {db,config}=ctx;
   app.post('/v1/admin/orders/:orderId/quotes',async(request)=>{
-    const actor=await requireActor({db,config,request,actorTypes:['admin']}); requireCsrf(config,request);
+    const admin=await requireAdminPermission({db,config,request,permission:'quotes.manage'}); requireCsrf(config,request);
+    const actor={actor_type:'admin',actor_id:admin.id};
     const quote=await createAndSendQuote({db,actor,orderId:assertUuid(request.params.orderId,'orderId'),items:request.body?.items,notes:request.body?.notes,validUntil:optionalIsoTimestamp(request.body?.validUntil,'validUntil'),context:requestContext(config,request)});
     return {ok:true,quote};
   });

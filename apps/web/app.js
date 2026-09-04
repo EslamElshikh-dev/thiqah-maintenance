@@ -1,5 +1,20 @@
 const apiBase = document.querySelector('meta[name="api-base"]')?.content.replace(/\/$/, '') || '';
-const state = { settings: null, challengeId: null, phone: null, idempotencyKey: null };
+const state = { settings: null, challengeId: null, phone: null, idempotencyKey: null, catalogSource: 'api' };
+
+const fallbackCatalog = {
+  services: [
+    ['plumbing', 'السباكة وكشف التسربات'], ['electrical', 'الكهرباء والإنارة'], ['ac', 'التكييف والتبريد'],
+    ['general', 'الصيانة المنزلية العامة'], ['buildings', 'صيانة الشقق والمباني'], ['appliances', 'صيانة الأجهزة المنزلية'],
+    ['carpentry', 'النجارة والأبواب'], ['painting', 'الدهانات والترميم'], ['cctv', 'الكاميرات والأنظمة الذكية']
+  ].map(([code, name_ar]) => ({ id: `catalog:${code}`, code, name_ar })),
+  serviceAreas: [
+    'الياسمين','الملقا','النرجس','العقيق','الصحافة','الروضة','الربوة','قرطبة','غرناطة','اشبيلية',
+    'حطين','القيروان','السليمانية','الورود','النخيل','الرائد','المحمدية','الرحمانية','المروج','التعاون',
+    'الازدهار','الوادي','الفلاح','الندى','العارض','العليا','الملز','المربع','الشفا','العزيزية',
+    'السويدي','لبن','ظهرة لبن','طويق','المونسية','الرمال','الخليج','اليرموك','النسيم','النهضة',
+    'الجزيرة','الفيحاء','المصيف','بدر'
+  ].map((name_ar, index) => ({ id: `catalog:riyadh:${index}`, name_ar, city: 'الرياض' }))
+};
 
 const sheet = document.querySelector('#order-sheet');
 const orderForm = document.querySelector('#order-form');
@@ -40,6 +55,7 @@ async function loadSettings() {
   try {
     const data = await request('/v1/settings');
     state.settings = data;
+    state.catalogSource = 'api';
     serviceSelect.replaceChildren(option('', 'اختر نوع الخدمة'));
     areaSelect.replaceChildren(option('', 'اختر الحي'));
     data.services.forEach((item) => serviceSelect.append(option(item.id, item.name_ar)));
@@ -47,10 +63,14 @@ async function loadSettings() {
     orderSubmit.disabled = false;
     return true;
   } catch {
-    serviceSelect.replaceChildren(option('', 'الخدمات غير متاحة حاليًا'));
-    areaSelect.replaceChildren(option('', 'التغطية غير متاحة حاليًا'));
-    orderSubmit.disabled = true;
-    setMessage(orderMessage, 'واجهة staging جاهزة؛ تفعيل الطلبات ينتظر اتصال الـAPI الجديد.', 'error');
+    state.settings = fallbackCatalog;
+    state.catalogSource = 'fallback';
+    serviceSelect.replaceChildren(option('', 'اختر نوع الخدمة'));
+    areaSelect.replaceChildren(option('', 'اختر الحي داخل الرياض'));
+    fallbackCatalog.services.forEach((item) => serviceSelect.append(option(item.id, item.name_ar)));
+    fallbackCatalog.serviceAreas.forEach((item) => areaSelect.append(option(item.id, `${item.name_ar} — ${item.city}`)));
+    orderSubmit.disabled = false;
+    setMessage(orderMessage, 'يمكنك اختيار الخدمة والحي الآن؛ تُحفظ المسودة على جهازك لحين اتصال خدمة الطلبات.', 'success');
     return false;
   }
 }
@@ -129,6 +149,12 @@ orderForm.addEventListener('submit', async (event) => {
   try {
     if (!state.challengeId) {
       const payload = formPayload(orderForm);
+      if (state.catalogSource === 'fallback') {
+        sessionStorage.setItem('thiqah:order-draft', JSON.stringify({ ...payload, savedAt: new Date().toISOString() }));
+        setMessage(orderMessage, 'حفظنا مسودة طلبك على هذا الجهاز. الإرسال النهائي سيتاح فور تشغيل خدمة الطلبات.', 'success');
+        orderSubmit.textContent = previous;
+        return;
+      }
       state.phone = payload.contactPhone;
       const result = await request('/v1/orders/guest/start', { method: 'POST', body: JSON.stringify(payload) });
       state.challengeId = result.challengeId;
@@ -190,5 +216,17 @@ const observer = new IntersectionObserver((entries) => {
   navLinks.forEach((link) => link.classList.toggle('is-active', link.getAttribute('href') === `#${visible.target.id}`));
 }, { rootMargin: '-35% 0px -55%', threshold: [0, .25, .5] });
 sections.forEach((section) => observer.observe(section));
+
+const revealObserver = new IntersectionObserver((entries, instance) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    entry.target.classList.add('is-visible');
+    instance.unobserve(entry.target);
+  });
+}, { rootMargin: '0px 0px -8%', threshold: .12 });
+document.querySelectorAll('.section-heading, .service-card, .experience__copy, .metric-panel, .coverage-copy, .district-cloud, .track-card, .app-download__art, .app-download__copy').forEach((element) => {
+  element.classList.add('reveal');
+  revealObserver.observe(element);
+});
 
 loadSettings();
